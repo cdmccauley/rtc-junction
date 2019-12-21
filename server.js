@@ -5,18 +5,20 @@ const { Server } = require('ws');
 
 const PORT = process.env.PORT || 3000;
 const INDEX = '/public/index.html';
+const STYLE = '/public/style.css';
 const CLIENT = '/public/client.js';
 
 const server = express()
   .use((req, res) => {
     switch (req.originalUrl) {
-      case '/':
-        res.sendFile(INDEX, {root: __dirname});
+      case '/style.css':
+        res.sendFile(STYLE, {root: __dirname});
         break;
       case '/client.js':
         res.sendFile(CLIENT, {root: __dirname});
         break;
       default:
+        res.sendFile(INDEX, {root: __dirname});
         break;
     }
     
@@ -124,15 +126,19 @@ wss.on('connection', (ws) => {
     }
   });
 
-  ws.send('hello world');
+  // ws.send('connected to server...');
+  sendTo(ws, {
+    type: 'log',
+    message: 'connected to server...'
+  });
 
 });
 
-setInterval(() => {
-  wss.clients.forEach((client) => {
-    client.send(new Date().toTimeString());
-  });
-}, 1000);
+// setInterval(() => {
+//   wss.clients.forEach((client) => {
+//     client.send(new Date().toTimeString());
+//   });
+// }, 1000);
 
 function sendTo(connection, message) {
   connection.send(JSON.stringify(message));
