@@ -93,7 +93,7 @@ wss.on('connection', (ws) => {
       case 'leave':
         console.log('disconnecting from: ', data.name);
         var conn = users[data.name];
-        conn.otherName = null;
+        // conn.otherName = null; // causing server crash
         if(conn != null) {
           sendTo(conn, {
             type: 'leave'
@@ -114,9 +114,9 @@ wss.on('connection', (ws) => {
     if(ws.name) {
       delete users[ws.name];
       if(ws.otherName) {
-        console.log('disconnecting from: ', connection.otherName);
+        console.log('disconnecting from: ', ws.otherName);
         var conn = users[ws.otherName];
-        conn.otherName = null;
+        // conn.otherName = null; // causing server crash
         if(conn != null) {
           sendTo(conn, {
             type: 'leave'
@@ -126,19 +126,12 @@ wss.on('connection', (ws) => {
     }
   });
 
-  // ws.send('connected to server...');
   sendTo(ws, {
     type: 'log',
     message: 'connected to server...'
   });
 
 });
-
-// setInterval(() => {
-//   wss.clients.forEach((client) => {
-//     client.send(new Date().toTimeString());
-//   });
-// }, 1000);
 
 function sendTo(connection, message) {
   connection.send(JSON.stringify(message));

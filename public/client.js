@@ -5,6 +5,9 @@ let el;
 var name;
 var connectedUser;
 
+let dataStart;
+let dataEnd;
+
 ws.onopen = () => {
   console.log('connected to signaling server');
 }
@@ -35,8 +38,6 @@ ws.onmessage = (event) => {
     default:
       break;
   }
-  // el = document.getElementById('server-time');
-  // el.innerHTML = 'Server time: ' + event.data;
 };
 
 ws.onerror = (err) => {
@@ -88,11 +89,117 @@ function handleLogin(success) {
     callPage.style.display = 'block';
 
     var configuration = {
-      'iceServers': [{'url': 'stun.stun2.1.google.com:19302'}]
+      'iceServers': [{'urls': 'stun:stun2.1.google.com:19302'}]
     };
 
-    yourConn = new webkitRTCPeerConnection(configuration, {optional: [{RtpDataChannels: true}]});
+    yourConn = new RTCPeerConnection(configuration);
 
-    // setup ice handling
+    yourConn.onicecandidate = (event) => {
+      console.log('onicecandidate');
+      if(event.candidate) {
+        send({
+          type: 'candidate',
+          candidate: event.candidate
+        });
+      }
+    };
+
+    yourConn.ondatachannel = (event) => {
+      dataChannel = event.channel;
+    };
+
+    openDataChannel();
+
+    yourConn.oniceconnectionstatechange = (event) => {
+      console.log('ICE connection state change: ', yourConn.iceConnectionState);
+    }
   }
-}
+};
+
+callBtn.addEventListener('click', () => {
+  var callToUsername = callToUsernameInput.value;
+
+  if(callToUsername.length > 0) {
+    connectedUser = callToUsername;
+    yourConn.createOffer((offer) => {
+      yourConn.setLocalDescription(offer);
+      send({
+        type: 'offer',
+        offer: offer
+      });
+    }, (error) => {
+      console.log('create offer error: ', error);
+      alert('error creating offer');
+    });
+  }
+});
+
+function handleOffer(offer, name) {
+  connectedUser = name;
+  yourConn.setRemoteDescription(new RTCSessionDescription(offer));
+  yourConn.createAnswer((answer) => {
+    yourConn.setLocalDescription(answer);
+    send({
+      type: 'answer',
+      answer: answer
+    });
+  }, (error) => {
+    console.log('create answer error: ', error);
+    alert('error when creating answer');
+  });
+};
+
+function handleAnswer(answer) {
+  yourConn.setRemoteDescription(new RTCSessionDescription(answer));
+};
+
+function handleCandidate(candidate) {
+  yourConn.addIceCandidate(new RTCIceCandidate(candidate));
+};
+
+function openDataChannel() {
+
+  dataChannel = yourConn.createDataChannel('channel1', {reliable: true});
+  
+  console.log('data channel created: ', dataChannel);
+
+  dataChannel.onerror = (error) => {
+    console.log('datachannel error: ', error);datachannel
+  }
+
+  dataChannel.onmessage = (event) => {
+    console.log('new message received: ', event.data);
+    chatArea.innerHTML += connectedUser + ': ' + event.data + '<br />';
+  };
+
+  dataChannel.onopen = () => {
+    dataStart = new Date();
+    console.log('datachannel open');
+  }
+
+  dataChannel.onclose = () => {
+    dataEnd = new Date();
+    console.log('datachannel is closed. duration: ', dataEnd - dataStart, 'ms');
+  };
+  
+};
+
+hangUpBtn.addEventListener('click', () => {
+  send({
+    type: 'leave'
+  });
+  handleLeave();
+})
+
+function handleLeave() {
+  connectedUser = null;
+  yourConn.close();
+  yourConn.onicecandidate = null;
+};
+
+sendMsgBtn.addEventListener('click', (event) => {
+  var val = msgInput.value;
+  chatArea.innerHTML += name + ': ' + val + '<br />';
+  dataChannel.send(val);
+  msgInput.value = '';
+});
