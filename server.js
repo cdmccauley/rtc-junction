@@ -117,11 +117,11 @@ wss.on('connection', (ws) => {
         console.log('disconnecting from: ', ws.otherName);
         var conn = users[ws.otherName];
         // conn.otherName = null; // causing server crash
-        if(conn != null) {
-          sendTo(conn, {
-            type: 'leave'
-          });
-        }
+        // if(conn != null) {
+        //   sendTo(conn, {
+        //     type: 'leave'
+        //   });
+        // }
       }
     }
   });
