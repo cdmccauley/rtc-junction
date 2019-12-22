@@ -90,16 +90,16 @@ wss.on('connection', (ws) => {
           });
         }
         break;
-      case 'leave':
-        console.log('disconnecting from: ', data.name);
-        var conn = users[data.name];
-        // conn.otherName = null; // causing server crash
-        if(conn != null) {
-          sendTo(conn, {
-            type: 'leave'
-          });
-        }
-        break;
+      // case 'leave':
+      //   console.log('disconnecting from: ', data.name);
+      //   var conn = users[data.name];
+      //   // conn.otherName = null; // causing server crash
+      //   if(conn != null) {
+      //     sendTo(conn, {
+      //       type: 'leave'
+      //     });
+      //   }
+      //   break;
       default:
         sendTo(ws, {
           type: 'error',

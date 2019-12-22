@@ -175,6 +175,7 @@ function openDataChannel() {
   dataChannel.onopen = () => {
     dataStart = new Date();
     console.log('datachannel open');
+    // kill server connection
   }
 
   dataChannel.onclose = () => {
