@@ -1,36 +1,30 @@
 'use strict';
 
+const path = require('path');
 const express = require('express');
 const { Server } = require('ws');
 
 const PORT = process.env.PORT || 3000;
-const INDEX = '/public/index.html';
-const STYLE = '/public/style.css';
-const CLIENT = '/public/client.js';
+
+// const PUBLIC = '/public';
+
+// const server = express()
+//   .use((req, res) => {
+//     console.log('request for resource: ', req.originalUrl);
+//     res.sendFile(req.originalUrl, {root: __dirname + PUBLIC});
+//   })
+//   .listen(PORT, () => console.log(`listening on ${PORT}`));
 
 const server = express()
-  .use((req, res) => {
-    switch (req.originalUrl) {
-      case '/style.css':
-        res.sendFile(STYLE, {root: __dirname});
-        break;
-      case '/client.js':
-        res.sendFile(CLIENT, {root: __dirname});
-        break;
-      default:
-        res.sendFile(INDEX, {root: __dirname});
-        break;
-    }
-    
-  })
-  .listen(PORT, () => console.log(`Listening on ${PORT}`));
+  .use(express.static(path.join(__dirname, 'public')))
+  .listen(PORT, () => console.log('listening on port: ', PORT));
 
 const wss = new Server({ server });
 
 var users = {};
 
 wss.on('connection', (ws) => {
-  console.log('Client connected');
+  console.log('client connected');
 
   ws.on('message', (message) => {
     var data;
@@ -94,7 +88,7 @@ wss.on('connection', (ws) => {
       //   console.log('disconnecting from: ', data.name);
       //   var conn = users[data.name];
       //   // conn.otherName = null; // causing server crash
-      //   if(conn != null) {
+      //   if(conn != null) { // causes rtc datachannel to close if connected
       //     sendTo(conn, {
       //       type: 'leave'
       //     });
@@ -110,14 +104,14 @@ wss.on('connection', (ws) => {
   });
 
   ws.on('close', () => {
-    console.log('Client disconnected')
+    console.log('client disconnected')
     if(ws.name) {
       delete users[ws.name];
       if(ws.otherName) {
         console.log('disconnecting from: ', ws.otherName);
         var conn = users[ws.otherName];
         // conn.otherName = null; // causing server crash
-        // if(conn != null) {
+        // if(conn != null) { // causes rtc datachannel to close if connected
         //   sendTo(conn, {
         //     type: 'leave'
         //   });
