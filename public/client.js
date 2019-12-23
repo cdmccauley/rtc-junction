@@ -24,11 +24,9 @@ ws.onmessage = (event) => {
       handleOffer(data.offer, data.name);
       break;
     case 'answer':
-      // handleAnswer(data.answer);
       handleAnswer(data.answer, data.name);
       break;
     case 'candidate':
-      // handleCandidate(data.candidate);
       handleCandidate(data.candidate, data.name);
       break;
     case 'leave':
@@ -72,9 +70,7 @@ var sendMsgBtn = document.querySelector('#sendMsgBtn');
 var chatArea = document.querySelector('#chatarea');
 
 
-// var rtcPeerConn;
 var rtcPeerConns = {};
-// var dataChannel;
 var dataChannels = {};
 
 callPage.style.display = 'none';
@@ -96,11 +92,6 @@ function handleLogin(success) {
   } else {
     loginPage.style.display = 'none';
     callPage.style.display = 'block';
-
-    // moved to call btn handler
-    
-    // end moved to call btn handler
-
   }
 };
 
@@ -109,15 +100,12 @@ callBtn.addEventListener('click', () => {
 
   if(callToUsername.length > 0) {
 
-    // from handleLogin
     var configuration = {
       'iceServers': [{'urls': 'stun:stun2.1.google.com:19302'}]
     };
 
-    // rtcPeerConn = new RTCPeerConnection(configuration);
     var newRtcPeerConn = new RTCPeerConnection(configuration);
 
-    // rtcPeerConn.onicecandidate = (event) => {
     newRtcPeerConn.onicecandidate = (event) => {
       console.log('onicecandidate');
       if(event.candidate) {
@@ -128,28 +116,18 @@ callBtn.addEventListener('click', () => {
       }
     };
 
-    // rtcPeerConn.ondatachannel = (event) => {
     newRtcPeerConn.ondatachannel = (event) => {
-      // dataChannel = event.channel;
       dataChannels[callToUsername] = { channel: event.channel };
     };
 
-    // openDataChannel();
     openDataChannel(newRtcPeerConn);
 
-    // rtcPeerConn.oniceconnectionstatechange = (event) => {
     newRtcPeerConn.oniceconnectionstatechange = () => {
-      // console.log('ICE connection state change: ', rtcPeerConn.iceConnectionState);
       console.log('ICE connection state change: ', newRtcPeerConn.iceConnectionState);
     }
 
-    // rtcPeerConns.push(newRtcPeerConn);
-    // end from handleLogin
-
     connectedUser = callToUsername;
-    // rtcPeerConn.createOffer((offer) => {
     newRtcPeerConn.createOffer((offer) => {
-      // rtcPeerConn.setLocalDescription(offer);
       newRtcPeerConn.setLocalDescription(offer);
       send({
         type: 'offer',
@@ -160,7 +138,6 @@ callBtn.addEventListener('click', () => {
       alert('error creating offer');
     });
 
-    // inserted after moving code from handleLogin
     rtcPeerConns[connectedUser] = { conn: newRtcPeerConn };
   }
 });
@@ -168,7 +145,6 @@ callBtn.addEventListener('click', () => {
 function handleOffer(offer, name) {
   connectedUser = name;
 
-  // from handleLogin
   var configuration = {
     'iceServers': [{'urls': 'stun:stun2.1.google.com:19302'}]
   };
@@ -189,19 +165,13 @@ function handleOffer(offer, name) {
     dataChannels[connectedUser] = { channel: event.channel };
   };
 
-  // openDataChannel();
   openDataChannel(offerRtcPeerConn, connectedUser);
 
   offerRtcPeerConn.oniceconnectionstatechange = () => {
     console.log('ICE connection state change: ', offerRtcPeerConn.iceConnectionState);
   }
-  // end from handleLogin
-
-  // rtcPeerConn.setRemoteDescription(new RTCSessionDescription(offer));
   offerRtcPeerConn.setRemoteDescription(new RTCSessionDescription(offer));
-  // rtcPeerConn.createAnswer((answer) => {
   offerRtcPeerConn.createAnswer((answer) => {
-    // rtcPeerConn.setLocalDescription(answer);
     offerRtcPeerConn.setLocalDescription(answer);
     send({
       type: 'answer',
@@ -212,48 +182,39 @@ function handleOffer(offer, name) {
     alert('error when creating answer');
   });
 
-  // inserted after code from handleLogin
   rtcPeerConns[connectedUser] = { conn: offerRtcPeerConn };
 };
 
 function handleAnswer(answer, senderName) {
-  // rtcPeerConn.setRemoteDescription(new RTCSessionDescription(answer));
   var answerPeerConn = rtcPeerConns[senderName].conn
   answerPeerConn.setRemoteDescription(new RTCSessionDescription(answer));
 };
 
 function handleCandidate(candidate, senderName) {
-  // rtcPeerConn.addIceCandidate(new RTCIceCandidate(candidate));
   var candPeerConn = rtcPeerConns[senderName].conn
   candPeerConn.addIceCandidate(new RTCIceCandidate(candidate));
 };
 
 function openDataChannel(peerConn, openName) {
-  // dataChannel = rtcPeerConn.createDataChannel('channel1', {reliable: true});
   newDataChannel = peerConn.createDataChannel('channel' + Object.keys(dataChannels).length, {reliable: true});
   
-  // console.log('data channel created: ', dataChannel);
   console.log('data channel created: ', newDataChannel);
 
-  // dataChannel.onerror = (error) => {
   newDataChannel.onerror = (error) => {
     console.log('datachannel error: ', error);
   }
 
-  // dataChannel.onmessage = (event) => {
   newDataChannel.onmessage = (event) => {
     console.log('new message received: ', event.data);
     chatArea.innerHTML += connectedUser + ': ' + event.data + '<br />';
   };
 
-  // dataChannel.onopen = () => {
   newDataChannel.onopen = () => {
     dataStart = new Date();
     console.log('datachannel open');
     // kill server connection
   }
 
-  // dataChannel.onclose = () => {
   newDataChannel.onclose = () => {
     dataEnd = new Date();
     console.log('datachannel is closed. duration: ', dataEnd - dataStart, 'ms');
@@ -282,9 +243,6 @@ sendMsgBtn.addEventListener('click', (event) => {
   chatArea.innerHTML += name + ': ' + val + '<br />';
   // dataChannel.send(val);
   for(let channel in dataChannels) {
-    // console.log('dataChannels: ', dataChannels);
-    // console.log('channel: ', channel);
-    // console.log('dataChannels[channel]: ', dataChannels[channel]);
     dataChannels[channel].channel.send(val);
   }
   msgInput.value = '';
