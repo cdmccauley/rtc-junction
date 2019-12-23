@@ -1,8 +1,8 @@
 let HOST = location.origin.replace(/^http/, 'ws')
 let ws = new WebSocket(HOST);
 
-var name;
-var connectedUser;
+let name;
+let connectedUser;
 
 let dataStart;
 let dataEnd;
@@ -14,7 +14,7 @@ ws.onopen = () => {
 ws.onmessage = (event) => {
   console.log('received message: ', event.data);
 
-  var data = JSON.parse(event.data);
+  let data = JSON.parse(event.data);
 
   switch(data.type) {
     case 'login':
@@ -55,23 +55,22 @@ function send(message) {
 
 // ui
 
-var loginPage = document.querySelector('#loginPage');
-var usernameInput = document.querySelector('#usernameInput');
-var loginBtn = document.querySelector('#loginBtn');
+let loginPage = document.querySelector('#loginPage');
+let usernameInput = document.querySelector('#usernameInput');
+let loginBtn = document.querySelector('#loginBtn');
 
-var callPage = document.querySelector('#callPage');
-var callToUsernameInput = document.querySelector('#callToUsernameInput');
-var callBtn = document.querySelector('#callBtn');
+let callPage = document.querySelector('#callPage');
+let callToUsernameInput = document.querySelector('#callToUsernameInput');
+let callBtn = document.querySelector('#callBtn');
 
-var hangUpBtn = document.querySelector('#hangUpBtn');
-var msgInput = document.querySelector('#msgInput');
-var sendMsgBtn = document.querySelector('#sendMsgBtn');
+let hangUpBtn = document.querySelector('#hangUpBtn');
+let msgInput = document.querySelector('#msgInput');
+let sendMsgBtn = document.querySelector('#sendMsgBtn');
 
-var chatArea = document.querySelector('#chatarea');
+let chatArea = document.querySelector('#chatarea');
 
-
-var rtcPeerConns = {};
-var dataChannels = {};
+let rtcPeerConns = {};
+let dataChannels = {};
 
 callPage.style.display = 'none';
 
@@ -96,15 +95,15 @@ function handleLogin(success) {
 };
 
 callBtn.addEventListener('click', () => {
-  var callToUsername = callToUsernameInput.value;
+  let callToUsername = callToUsernameInput.value;
 
   if(callToUsername.length > 0) {
 
-    var configuration = {
+    let configuration = {
       'iceServers': [{'urls': 'stun:stun2.1.google.com:19302'}]
     };
 
-    var newRtcPeerConn = new RTCPeerConnection(configuration);
+    let newRtcPeerConn = new RTCPeerConnection(configuration);
 
     newRtcPeerConn.onicecandidate = (event) => {
       console.log('onicecandidate');
@@ -145,11 +144,11 @@ callBtn.addEventListener('click', () => {
 function handleOffer(offer, name) {
   connectedUser = name;
 
-  var configuration = {
+  let configuration = {
     'iceServers': [{'urls': 'stun:stun2.1.google.com:19302'}]
   };
 
-  var offerRtcPeerConn = new RTCPeerConnection(configuration);
+  let offerRtcPeerConn = new RTCPeerConnection(configuration);
 
   offerRtcPeerConn.onicecandidate = (event) => {
     console.log('onicecandidate');
@@ -186,12 +185,12 @@ function handleOffer(offer, name) {
 };
 
 function handleAnswer(answer, senderName) {
-  var answerPeerConn = rtcPeerConns[senderName].conn
+  let answerPeerConn = rtcPeerConns[senderName].conn
   answerPeerConn.setRemoteDescription(new RTCSessionDescription(answer));
 };
 
 function handleCandidate(candidate, senderName) {
-  var candPeerConn = rtcPeerConns[senderName].conn
+  let candPeerConn = rtcPeerConns[senderName].conn
   candPeerConn.addIceCandidate(new RTCIceCandidate(candidate));
 };
 
@@ -243,7 +242,7 @@ function handleLeave() {
 };
 
 sendMsgBtn.addEventListener('click', (event) => {
-  var val = msgInput.value;
+  let val = msgInput.value;
   chatArea.innerHTML += name + ': ' + val + '<br />';
   // dataChannel.send(val);
   for(let channel in dataChannels) {
