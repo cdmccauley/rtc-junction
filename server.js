@@ -21,13 +21,14 @@ const server = express()
 
 const wss = new Server({ server });
 
-var users = {};
+let users = {};
 
 wss.on('connection', (ws) => {
   console.log('client connected');
 
   ws.on('message', (message) => {
-    var data;
+    let data;
+    let conn;
     try {
       data = JSON.parse(message);
     } catch (e) {
@@ -53,7 +54,7 @@ wss.on('connection', (ws) => {
         break;
       case 'offer':
         console.log('sending offer to: ', data.name);
-        var conn = users[data.name];
+        conn = users[data.name];
         if(conn != null) {
           ws.otherName = data.name;
           sendTo(conn, {
@@ -65,7 +66,7 @@ wss.on('connection', (ws) => {
         break;
       case 'answer':
         console.log('sending answer to: ', data.name);
-        var conn = users[data.name];
+        conn = users[data.name];
         if(conn != null) {
           ws.otherName = data.name;
           sendTo(conn, {
@@ -77,7 +78,7 @@ wss.on('connection', (ws) => {
         break;
       case 'candidate':
         console.log('sending candidate to: ', data.name);
-        var conn = users[data.name];
+        conn = users[data.name];
         if(conn != null) {
           sendTo(conn, {
             type: 'candidate',
@@ -111,7 +112,7 @@ wss.on('connection', (ws) => {
       delete users[ws.name];
       if(ws.otherName) {
         console.log('disconnecting from: ', ws.otherName);
-        var conn = users[ws.otherName];
+        let conn = users[ws.otherName];
         // conn.otherName = null; // causing server crash
         // if(conn != null) { // causes rtc datachannel to close if connected
         //   sendTo(conn, {
@@ -133,7 +134,7 @@ function sendTo(connection, message) {
   connection.send(JSON.stringify(message));
 }
 
-var keepAlive = {
+let keepAlive = {
   type: 'log',
   message: 'ping from server'
 }

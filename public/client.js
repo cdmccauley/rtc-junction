@@ -1,17 +1,14 @@
+/*
+ *  connect to signal server
+ */
 let HOST = location.origin.replace(/^http/, 'ws')
-let ws = new WebSocket(HOST);
+let signalServer = new WebSocket(HOST);
 
-let name;
-let connectedUser;
-
-let dataStart;
-let dataEnd;
-
-ws.onopen = () => {
+signalServer.onopen = () => {
   console.log('connected to signaling server');
 }
 
-ws.onmessage = (event) => {
+signalServer.onmessage = (event) => {
   console.log('received message: ', event.data);
 
   let data = JSON.parse(event.data);
@@ -39,18 +36,31 @@ ws.onmessage = (event) => {
   }
 };
 
-ws.onerror = (err) => {
+signalServer.onerror = (err) => {
   console.log('error: ', err);
 }
+
+/*
+ * 
+ */
+
+let name;
+let peerName;
+
+let rtcPeerConns = {};
+let dataChannels = {};
+
+let dataStart;
+let dataEnd;
 
 function send(message) {
   if (name) {
     message.sender = name;
   }
-  if(connectedUser) {
-    message.name = connectedUser;
+  if(peerName) {
+    message.name = peerName;
   }
-  ws.send(JSON.stringify(message));
+  signalServer.send(JSON.stringify(message));
 };
 
 // ui
@@ -68,9 +78,6 @@ let msgInput = document.querySelector('#msgInput');
 let sendMsgBtn = document.querySelector('#sendMsgBtn');
 
 let chatArea = document.querySelector('#chatarea');
-
-let rtcPeerConns = {};
-let dataChannels = {};
 
 callPage.style.display = 'none';
 
@@ -125,7 +132,7 @@ callBtn.addEventListener('click', () => {
       console.log('ICE connection state change: ', newRtcPeerConn.iceConnectionState);
     }
 
-    connectedUser = callToUsername;
+    peerName = callToUsername;
     newRtcPeerConn.createOffer((offer) => {
       newRtcPeerConn.setLocalDescription(offer);
       send({
@@ -137,12 +144,12 @@ callBtn.addEventListener('click', () => {
       alert('error creating offer');
     });
 
-    rtcPeerConns[connectedUser] = { conn: newRtcPeerConn };
+    rtcPeerConns[peerName] = { conn: newRtcPeerConn };
   }
 });
 
 function handleOffer(offer, name) {
-  connectedUser = name;
+  peerName = name;
 
   let configuration = {
     'iceServers': [{'urls': 'stun:stun2.1.google.com:19302'}]
@@ -161,10 +168,10 @@ function handleOffer(offer, name) {
   };
 
   offerRtcPeerConn.ondatachannel = (event) => {
-    dataChannels[connectedUser] = { channel: event.channel };
+    dataChannels[peerName] = { channel: event.channel };
   };
 
-  openDataChannel(offerRtcPeerConn, connectedUser);
+  openDataChannel(offerRtcPeerConn, peerName);
 
   offerRtcPeerConn.oniceconnectionstatechange = () => {
     console.log('ICE connection state change: ', offerRtcPeerConn.iceConnectionState);
@@ -181,7 +188,7 @@ function handleOffer(offer, name) {
     alert('error when creating answer');
   });
 
-  rtcPeerConns[connectedUser] = { conn: offerRtcPeerConn };
+  rtcPeerConns[peerName] = { conn: offerRtcPeerConn };
 };
 
 function handleAnswer(answer, senderName) {
@@ -208,7 +215,7 @@ function openDataChannel(peerConn, openName) {
     message = JSON.parse(event.data);
     
     console.log('new message received: ', event.data);
-    // chatArea.innerHTML += connectedUser + ': ' + event.data + '<br />';
+    // chatArea.innerHTML += peerName + ': ' + event.data + '<br />';
     chatArea.innerHTML += message.sender + ': ' + message.msg + '<br />';
   };
 
@@ -235,7 +242,7 @@ hangUpBtn.addEventListener('click', () => {
 })
 
 function handleLeave() {
-  // connectedUser = null;
+  // peerName = null;
   // rtcPeerConn.close();
   // rtcPeerConn.onicecandidate = null;
   console.log('TODO: handleLeave()');
