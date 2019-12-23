@@ -120,7 +120,7 @@ callBtn.addEventListener('click', () => {
       dataChannels[callToUsername] = { channel: event.channel };
     };
 
-    openDataChannel(newRtcPeerConn);
+    openDataChannel(newRtcPeerConn, callToUsername);
 
     newRtcPeerConn.oniceconnectionstatechange = () => {
       console.log('ICE connection state change: ', newRtcPeerConn.iceConnectionState);
@@ -196,7 +196,8 @@ function handleCandidate(candidate, senderName) {
 };
 
 function openDataChannel(peerConn, openName) {
-  newDataChannel = peerConn.createDataChannel('channel' + Object.keys(dataChannels).length, {reliable: true});
+  // newDataChannel = peerConn.createDataChannel('channel' + Object.keys(dataChannels).length, {reliable: true});
+  newDataChannel = peerConn.createDataChannel(openName, {reliable: true});
   
   console.log('data channel created: ', newDataChannel);
 
