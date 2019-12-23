@@ -138,9 +138,9 @@ callBtn.addEventListener('click', () => {
     openDataChannel(newRtcPeerConn);
 
     // rtcPeerConn.oniceconnectionstatechange = (event) => {
-    newRtcPeerConn.oniceconnectionstatechange = (event) => {
+    newRtcPeerConn.oniceconnectionstatechange = () => {
       // console.log('ICE connection state change: ', rtcPeerConn.iceConnectionState);
-      console.log('ICE connection state change: ', event);
+      console.log('ICE connection state change: ', newRtcPeerConn.iceConnectionState);
     }
 
     // rtcPeerConns.push(newRtcPeerConn);
@@ -192,8 +192,8 @@ function handleOffer(offer, name) {
   // openDataChannel();
   openDataChannel(offerRtcPeerConn, connectedUser);
 
-  offerRtcPeerConn.oniceconnectionstatechange = (event) => {
-    console.log('ICE connection state change: ', event);
+  offerRtcPeerConn.oniceconnectionstatechange = () => {
+    console.log('ICE connection state change: ', offerRtcPeerConn.iceConnectionState);
   }
   // end from handleLogin
 
