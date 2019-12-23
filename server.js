@@ -70,7 +70,8 @@ wss.on('connection', (ws) => {
           ws.otherName = data.name;
           sendTo(conn, {
             type: 'answer',
-            answer: data.answer
+            answer: data.answer,
+            name: ws.name // added for multi
           });
         }
         break;
@@ -80,7 +81,8 @@ wss.on('connection', (ws) => {
         if(conn != null) {
           sendTo(conn, {
             type: 'candidate',
-            candidate: data.candidate
+            candidate: data.candidate,
+            name: ws.name // added for multi
           });
         }
         break;
