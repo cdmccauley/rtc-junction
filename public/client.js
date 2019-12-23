@@ -18,13 +18,16 @@ signalServer.onmessage = (event) => {
       handleLogin(data.success);
       break;
     case 'offer':
-      handleOffer(data.offer, data.name);
+      // handleOffer(data.offer, data.name);
+      handleOffer(data.offer, data.sender);
       break;
     case 'answer':
-      handleAnswer(data.answer, data.name);
+      // handleAnswer(data.answer, data.name);
+      handleAnswer(data.answer, data.sender);
       break;
     case 'candidate':
-      handleCandidate(data.candidate, data.name);
+      // handleCandidate(data.candidate, data.name);
+      handleCandidate(data.candidate, data.sender);
       break;
     case 'leave':
       handleLeave();
@@ -58,7 +61,8 @@ function send(message) {
     message.sender = name;
   }
   if(peerName) {
-    message.name = peerName;
+    // message.name = peerName;
+    message.receiver = peerName;
   }
   signalServer.send(JSON.stringify(message));
 };
@@ -87,7 +91,7 @@ loginBtn.addEventListener('click', (event) => {
   if(name.length > 0) {
     send({
       type: 'login',
-      name: name
+      // name: name
     });
   }
 });
