@@ -122,7 +122,7 @@ wss.on('connection', (ws) => {
 
   sendTo(ws, {
     type: 'log',
-    message: 'connected to server...'
+    message: 'connected to server'
   });
 
 });
@@ -130,3 +130,16 @@ wss.on('connection', (ws) => {
 function sendTo(connection, message) {
   connection.send(JSON.stringify(message));
 }
+
+var keepAlive = {
+  type: 'log',
+  message: 'ping from server'
+}
+
+// keepalive
+setInterval(() => {
+  wss.clients.forEach((client) => {
+    // client.send(new Date().toTimeString());
+    sendTo(client, keepAlive);
+  });
+}, 50000);

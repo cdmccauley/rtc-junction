@@ -66,7 +66,7 @@ var msgInput = document.querySelector('#msgInput');
 var sendMsgBtn = document.querySelector('#sendMsgBtn');
 
 var chatArea = document.querySelector('#chatarea');
-var yourConn;
+var rtcPeerConn;
 var dataChannel;
 callPage.style.display = 'none';
 
@@ -92,9 +92,9 @@ function handleLogin(success) {
       'iceServers': [{'urls': 'stun:stun2.1.google.com:19302'}]
     };
 
-    yourConn = new RTCPeerConnection(configuration);
+    rtcPeerConn = new RTCPeerConnection(configuration);
 
-    yourConn.onicecandidate = (event) => {
+    rtcPeerConn.onicecandidate = (event) => {
       console.log('onicecandidate');
       if(event.candidate) {
         send({
@@ -104,14 +104,14 @@ function handleLogin(success) {
       }
     };
 
-    yourConn.ondatachannel = (event) => {
+    rtcPeerConn.ondatachannel = (event) => {
       dataChannel = event.channel;
     };
 
     openDataChannel();
 
-    yourConn.oniceconnectionstatechange = (event) => {
-      console.log('ICE connection state change: ', yourConn.iceConnectionState);
+    rtcPeerConn.oniceconnectionstatechange = (event) => {
+      console.log('ICE connection state change: ', rtcPeerConn.iceConnectionState);
     }
   }
 };
@@ -121,8 +121,8 @@ callBtn.addEventListener('click', () => {
 
   if(callToUsername.length > 0) {
     connectedUser = callToUsername;
-    yourConn.createOffer((offer) => {
-      yourConn.setLocalDescription(offer);
+    rtcPeerConn.createOffer((offer) => {
+      rtcPeerConn.setLocalDescription(offer);
       send({
         type: 'offer',
         offer: offer
@@ -136,9 +136,9 @@ callBtn.addEventListener('click', () => {
 
 function handleOffer(offer, name) {
   connectedUser = name;
-  yourConn.setRemoteDescription(new RTCSessionDescription(offer));
-  yourConn.createAnswer((answer) => {
-    yourConn.setLocalDescription(answer);
+  rtcPeerConn.setRemoteDescription(new RTCSessionDescription(offer));
+  rtcPeerConn.createAnswer((answer) => {
+    rtcPeerConn.setLocalDescription(answer);
     send({
       type: 'answer',
       answer: answer
@@ -150,16 +150,16 @@ function handleOffer(offer, name) {
 };
 
 function handleAnswer(answer) {
-  yourConn.setRemoteDescription(new RTCSessionDescription(answer));
+  rtcPeerConn.setRemoteDescription(new RTCSessionDescription(answer));
 };
 
 function handleCandidate(candidate) {
-  yourConn.addIceCandidate(new RTCIceCandidate(candidate));
+  rtcPeerConn.addIceCandidate(new RTCIceCandidate(candidate));
 };
 
 function openDataChannel() {
 
-  dataChannel = yourConn.createDataChannel('channel1', {reliable: true});
+  dataChannel = rtcPeerConn.createDataChannel('channel1', {reliable: true});
   
   console.log('data channel created: ', dataChannel);
 
@@ -194,8 +194,8 @@ hangUpBtn.addEventListener('click', () => {
 
 function handleLeave() {
   connectedUser = null;
-  yourConn.close();
-  yourConn.onicecandidate = null;
+  rtcPeerConn.close();
+  rtcPeerConn.onicecandidate = null;
 };
 
 sendMsgBtn.addEventListener('click', (event) => {
