@@ -205,8 +205,11 @@ function openDataChannel(peerConn, openName) {
   }
 
   newDataChannel.onmessage = (event) => {
+    message = JSON.parse(event.data);
+    
     console.log('new message received: ', event.data);
-    chatArea.innerHTML += connectedUser + ': ' + event.data + '<br />';
+    // chatArea.innerHTML += connectedUser + ': ' + event.data + '<br />';
+    chatArea.innerHTML += message.sender + ': ' + message.msg + '<br />';
   };
 
   newDataChannel.onopen = () => {
@@ -243,7 +246,11 @@ sendMsgBtn.addEventListener('click', (event) => {
   chatArea.innerHTML += name + ': ' + val + '<br />';
   // dataChannel.send(val);
   for(let channel in dataChannels) {
-    dataChannels[channel].channel.send(val);
+    // dataChannels[channel].channel.send(val);
+    dataChannels[channel].channel.send(JSON.stringify({
+      sender: name,
+      msg: val
+    }))
   }
   msgInput.value = '';
 });
