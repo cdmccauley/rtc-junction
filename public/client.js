@@ -18,15 +18,12 @@ signalServer.onmessage = (event) => {
       handleLogin(data.success);
       break;
     case 'offer':
-      // handleOffer(data.offer, data.name);
       handleOffer(data.offer, data.sender);
       break;
     case 'answer':
-      // handleAnswer(data.answer, data.name);
       handleAnswer(data.answer, data.sender);
       break;
     case 'candidate':
-      // handleCandidate(data.candidate, data.name);
       handleCandidate(data.candidate, data.sender);
       break;
     case 'leave':
@@ -61,7 +58,6 @@ function send(message) {
     message.sender = name;
   }
   if(peerName) {
-    // message.name = peerName;
     message.receiver = peerName;
   }
   signalServer.send(JSON.stringify(message));
@@ -91,7 +87,6 @@ loginBtn.addEventListener('click', (event) => {
   if(name.length > 0) {
     send({
       type: 'login',
-      // name: name
     });
   }
 });
@@ -206,7 +201,6 @@ function handleCandidate(candidate, senderName) {
 };
 
 function openDataChannel(peerConn, openName) {
-  // newDataChannel = peerConn.createDataChannel('channel' + Object.keys(dataChannels).length, {reliable: true});
   newDataChannel = peerConn.createDataChannel(openName, {reliable: true});
   
   console.log('data channel created: ', newDataChannel);
@@ -219,7 +213,6 @@ function openDataChannel(peerConn, openName) {
     message = JSON.parse(event.data);
     
     console.log('new message received: ', event.data);
-    // chatArea.innerHTML += peerName + ': ' + event.data + '<br />';
     chatArea.innerHTML += message.sender + ': ' + message.msg + '<br />';
   };
 
@@ -255,9 +248,7 @@ function handleLeave() {
 sendMsgBtn.addEventListener('click', (event) => {
   let val = msgInput.value;
   chatArea.innerHTML += name + ': ' + val + '<br />';
-  // dataChannel.send(val);
   for(let channel in dataChannels) {
-    // dataChannels[channel].channel.send(val);
     dataChannels[channel].channel.send(JSON.stringify({
       sender: name,
       msg: val
