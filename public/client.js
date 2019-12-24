@@ -45,7 +45,7 @@ signalServer.onerror = (err) => {
  */
 
 let name;
-let peerName;
+// let peerName;
 
 let rtcPeerConns = {};
 let dataChannels = {};
@@ -57,9 +57,9 @@ function send(message) {
   if (name) {
     message.sender = name;
   }
-  if(peerName) {
-    message.receiver = peerName;
-  }
+  // if(peerName) {
+  //   message.receiver = peerName;
+  // }
   signalServer.send(JSON.stringify(message));
 };
 
@@ -100,12 +100,8 @@ function handleLogin(success) {
   }
 };
 
-callBtn.addEventListener('click', () => {
-  let callToUsername = callToUsernameInput.value;
-
-  if(callToUsername.length > 0) {
-
-    let configuration = {
+function getRtcPC(peer) {
+  let configuration = {
       'iceServers': [{'urls': 'stun:stun2.1.google.com:19302'}]
     };
 
@@ -117,77 +113,128 @@ callBtn.addEventListener('click', () => {
         send({
           type: 'candidate',
           candidate: event.candidate,
+          receiver: peer
         });
       }
     };
 
     newRtcPeerConn.ondatachannel = (event) => {
-      dataChannels[callToUsername] = { channel: event.channel };
+      dataChannels[peer] = { channel: event.channel };
     };
 
-    openDataChannel(newRtcPeerConn, callToUsername);
+    openDataChannel(newRtcPeerConn, peer);
 
     newRtcPeerConn.oniceconnectionstatechange = () => {
       console.log('ICE connection state change: ', newRtcPeerConn.iceConnectionState);
-    }
+    };
 
-    peerName = callToUsername;
+    return newRtcPeerConn;
+}
+
+callBtn.addEventListener('click', () => {
+  let receiver = callToUsernameInput.value;
+
+  if(receiver.length > 0) {
+
+    // start copy
+    // let configuration = {
+    //   'iceServers': [{'urls': 'stun:stun2.1.google.com:19302'}]
+    // };
+
+    // let newRtcPeerConn = new RTCPeerConnection(configuration);
+
+    // newRtcPeerConn.onicecandidate = (event) => {
+    //   console.log('onicecandidate');
+    //   if(event.candidate) {
+    //     send({
+    //       type: 'candidate',
+    //       candidate: event.candidate,
+    //     });
+    //   }
+    // };
+
+    // newRtcPeerConn.ondatachannel = (event) => {
+    //   dataChannels[callToUsername] = { channel: event.channel };
+    // };
+
+    // openDataChannel(newRtcPeerConn, callToUsername);
+
+    // newRtcPeerConn.oniceconnectionstatechange = () => {
+    //   console.log('ICE connection state change: ', newRtcPeerConn.iceConnectionState);
+    // }
+    // end copy
+
+    // peerName = receiver; // TODO: refactor so peerName isn't available or necessary
+
+    let newRtcPeerConn = getRtcPC(receiver);
+
+    console.log('pre-offer newRtcPeerConn: ', newRtcPeerConn);
+
     newRtcPeerConn.createOffer((offer) => {
       newRtcPeerConn.setLocalDescription(offer);
       send({
         type: 'offer',
         offer: offer,
+        receiver: receiver
       });
     }, (error) => {
       console.log('create offer error: ', error);
       alert('error creating offer');
     });
 
-    rtcPeerConns[peerName] = { conn: newRtcPeerConn };
+    console.log('post-offer newRtcPeerConn: ', newRtcPeerConn);
+
+    rtcPeerConns[receiver] = { conn: newRtcPeerConn };
   }
 });
 
 function handleOffer(offer, name) {
-  peerName = name;
+  // peerName = name; // TODO: refactor to remove module level
+  let sender = name;
 
-  let configuration = {
-    'iceServers': [{'urls': 'stun:stun2.1.google.com:19302'}]
-  };
+  // let configuration = {
+  //   'iceServers': [{'urls': 'stun:stun2.1.google.com:19302'}]
+  // };
 
-  let offerRtcPeerConn = new RTCPeerConnection(configuration);
+  // let offerRtcPeerConn = new RTCPeerConnection(configuration);
 
-  offerRtcPeerConn.onicecandidate = (event) => {
-    console.log('onicecandidate');
-    if(event.candidate) {
-      send({
-        type: 'candidate',
-        candidate: event.candidate,
-      });
-    }
-  };
+  // offerRtcPeerConn.onicecandidate = (event) => {
+  //   console.log('onicecandidate');
+  //   if(event.candidate) {
+  //     send({
+  //       type: 'candidate',
+  //       candidate: event.candidate,
+  //     });
+  //   }
+  // };
 
-  offerRtcPeerConn.ondatachannel = (event) => {
-    dataChannels[peerName] = { channel: event.channel };
-  };
+  // offerRtcPeerConn.ondatachannel = (event) => {
+  //   dataChannels[peerName] = { channel: event.channel };
+  // };
 
-  openDataChannel(offerRtcPeerConn, peerName);
+  // openDataChannel(offerRtcPeerConn, peerName);
 
-  offerRtcPeerConn.oniceconnectionstatechange = () => {
-    console.log('ICE connection state change: ', offerRtcPeerConn.iceConnectionState);
-  }
+  // offerRtcPeerConn.oniceconnectionstatechange = () => {
+  //   console.log('ICE connection state change: ', offerRtcPeerConn.iceConnectionState);
+  // }
+
+  let offerRtcPeerConn = getRtcPC(sender);
+
   offerRtcPeerConn.setRemoteDescription(new RTCSessionDescription(offer));
+
   offerRtcPeerConn.createAnswer((answer) => {
     offerRtcPeerConn.setLocalDescription(answer);
     send({
       type: 'answer',
       answer: answer,
+      receiver: sender
     });
   }, (error) => {
     console.log('create answer error: ', error);
     alert('error when creating answer');
   });
 
-  rtcPeerConns[peerName] = { conn: offerRtcPeerConn };
+  rtcPeerConns[sender] = { conn: offerRtcPeerConn };
 };
 
 function handleAnswer(answer, senderName) {
