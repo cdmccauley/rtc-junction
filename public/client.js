@@ -1,15 +1,18 @@
 /*
- *  connect to signal server
+ *  connect to signaling server
  */
 let HOST = location.origin.replace(/^http/, 'ws')
-let signalServer = new WebSocket(HOST);
+let signalingServer = new WebSocket(HOST);
 
-signalServer.onopen = () => {
-  console.log('connected to signaling server');
+signalingServer.onopen = () => {
+  console.log('connection to signaling server established');
 }
 
-signalServer.onmessage = (event) => {
-  console.log('received message: ', event.data);
+/*
+ *  signaling server routing
+ */
+signalingServer.onmessage = (event) => {
+  console.log('signaling server message: ', event.data);
 
   let data = JSON.parse(event.data);
 
@@ -29,63 +32,35 @@ signalServer.onmessage = (event) => {
     case 'leave':
       handleLeave();
       break;
-    case 'log':
-      console.log(data.message);
+    // case 'log':
+    //   console.log(data.message);
     default:
       break;
   }
 };
 
-signalServer.onerror = (err) => {
+signalingServer.onerror = (err) => {
   console.log('error: ', err);
-}
+};
+
+signalingServer.onclose = () => {
+  console.log('connection to signaling server lost');
+};
 
 /*
- * 
+ *  functions
  */
-
 let name;
 
 let rtcPeerConns = {};
 let dataChannels = {};
 
-let dataStart;
-let dataEnd;
-
 function send(message) {
   if (name) {
     message.sender = name;
   }
-  signalServer.send(JSON.stringify(message));
+  signalingServer.send(JSON.stringify(message));
 };
-
-// ui
-
-let loginPage = document.querySelector('#loginPage');
-let usernameInput = document.querySelector('#usernameInput');
-let loginBtn = document.querySelector('#loginBtn');
-
-let callPage = document.querySelector('#callPage');
-let callToUsernameInput = document.querySelector('#callToUsernameInput');
-let callBtn = document.querySelector('#callBtn');
-
-let hangUpBtn = document.querySelector('#hangUpBtn');
-let msgInput = document.querySelector('#msgInput');
-let sendMsgBtn = document.querySelector('#sendMsgBtn');
-
-let chatArea = document.querySelector('#chatarea');
-
-callPage.style.display = 'none';
-
-loginBtn.addEventListener('click', (event) => {
-  name = usernameInput.value;
-
-  if(name.length > 0) {
-    send({
-      type: 'login',
-    });
-  }
-});
 
 function handleLogin(success) {
   if(success === false) {
@@ -111,7 +86,7 @@ function getRtcPC(peer) {
           candidate: event.candidate,
           receiver: peer
         });
-      }
+      };
     };
 
     newRtcPeerConn.ondatachannel = (event) => {
@@ -125,34 +100,7 @@ function getRtcPC(peer) {
     };
 
     return newRtcPeerConn;
-}
-
-callBtn.addEventListener('click', () => {
-  let receiver = callToUsernameInput.value;
-
-  if(receiver.length > 0) {
-
-    let newRtcPeerConn = getRtcPC(receiver);
-
-    console.log('pre-offer newRtcPeerConn: ', newRtcPeerConn);
-
-    newRtcPeerConn.createOffer((offer) => {
-      newRtcPeerConn.setLocalDescription(offer);
-      send({
-        type: 'offer',
-        offer: offer,
-        receiver: receiver
-      });
-    }, (error) => {
-      console.log('create offer error: ', error);
-      alert('error creating offer');
-    });
-
-    console.log('post-offer newRtcPeerConn: ', newRtcPeerConn);
-
-    rtcPeerConns[receiver] = { conn: newRtcPeerConn };
-  }
-});
+};
 
 function handleOffer(offer, name) {
   let sender = name;
@@ -195,34 +143,37 @@ function openDataChannel(peerConn, openName) {
     console.log('datachannel error: ', error);
   }
 
+  /*
+   *  data channel peer routing
+   */
   newDataChannel.onmessage = (event) => {
-    message = JSON.parse(event.data);
-    
     console.log('new message received: ', event.data);
-    chatArea.innerHTML += message.sender + ': ' + message.msg + '<br />';
+
+    let data = JSON.parse(event.data);
+    
+    switch(data.type) {
+      case 'message':
+        chatArea.innerHTML += data.sender + ': ' + data.message + '<br />';
+        break;
+      case 'relay':
+        break;
+      default:
+        break;
+    };
   };
 
-  newDataChannel.onopen = () => {
-    dataStart = new Date();
+  newDataChannel.onopen = (event) => {
     console.log('datachannel open');
-    // kill server connection
+    newDataChannel.established = new Date();
   }
 
-  newDataChannel.onclose = () => {
-    dataEnd = new Date();
-    console.log('datachannel is closed. duration: ', dataEnd - dataStart, 'ms');
+  newDataChannel.onclose = (event) => {
+    console.log('datachannel closed (duration: ', new Date() - newDataChannel.established, 'ms)');
   };
 
   dataChannels[openName] = { channel: newDataChannel };
   
 };
-
-hangUpBtn.addEventListener('click', () => {
-  send({
-    type: 'leave'
-  });
-  handleLeave();
-})
 
 function handleLeave() {
   // peerName = null;
@@ -231,14 +182,79 @@ function handleLeave() {
   console.log('TODO: handleLeave()');
 };
 
+/*
+ *  user interface
+ */
+
+let loginPage = document.querySelector('#loginPage');
+let usernameInput = document.querySelector('#usernameInput');
+let loginBtn = document.querySelector('#loginBtn');
+
+let callPage = document.querySelector('#callPage');
+let callToUsernameInput = document.querySelector('#callToUsernameInput');
+let callBtn = document.querySelector('#callBtn');
+
+let hangUpBtn = document.querySelector('#hangUpBtn');
+let msgInput = document.querySelector('#msgInput');
+let sendMsgBtn = document.querySelector('#sendMsgBtn');
+
+let chatArea = document.querySelector('#chatarea');
+
+callPage.style.display = 'none';
+
+loginBtn.addEventListener('click', (event) => {
+  name = usernameInput.value;
+
+  if(name.length > 0) {
+    send({
+      type: 'login',
+    });
+  };
+});
+
+callBtn.addEventListener('click', () => {
+  let receiver = callToUsernameInput.value;
+
+  if(receiver.length > 0) {
+
+    let newRtcPeerConn = getRtcPC(receiver);
+
+    console.log('pre-offer newRtcPeerConn: ', newRtcPeerConn);
+
+    newRtcPeerConn.createOffer((offer) => {
+      newRtcPeerConn.setLocalDescription(offer);
+      send({
+        type: 'offer',
+        offer: offer,
+        receiver: receiver
+      });
+    }, (error) => {
+      console.log('create offer error: ', error);
+      alert('error creating offer');
+    });
+
+    console.log('post-offer newRtcPeerConn: ', newRtcPeerConn);
+
+    rtcPeerConns[receiver] = { conn: newRtcPeerConn };
+  }
+});
+
+hangUpBtn.addEventListener('click', () => {
+  send({
+    type: 'leave'
+  });
+  handleLeave();
+});
+
 sendMsgBtn.addEventListener('click', (event) => {
   let val = msgInput.value;
   chatArea.innerHTML += name + ': ' + val + '<br />';
   for(let channel in dataChannels) {
     dataChannels[channel].channel.send(JSON.stringify({
+      type: 'message',
       sender: name,
-      msg: val
+      message: val
     }))
-  }
+  };
   msgInput.value = '';
 });
