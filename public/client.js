@@ -45,7 +45,6 @@ signalServer.onerror = (err) => {
  */
 
 let name;
-// let peerName;
 
 let rtcPeerConns = {};
 let dataChannels = {};
@@ -57,9 +56,6 @@ function send(message) {
   if (name) {
     message.sender = name;
   }
-  // if(peerName) {
-  //   message.receiver = peerName;
-  // }
   signalServer.send(JSON.stringify(message));
 };
 
@@ -136,36 +132,6 @@ callBtn.addEventListener('click', () => {
 
   if(receiver.length > 0) {
 
-    // start copy
-    // let configuration = {
-    //   'iceServers': [{'urls': 'stun:stun2.1.google.com:19302'}]
-    // };
-
-    // let newRtcPeerConn = new RTCPeerConnection(configuration);
-
-    // newRtcPeerConn.onicecandidate = (event) => {
-    //   console.log('onicecandidate');
-    //   if(event.candidate) {
-    //     send({
-    //       type: 'candidate',
-    //       candidate: event.candidate,
-    //     });
-    //   }
-    // };
-
-    // newRtcPeerConn.ondatachannel = (event) => {
-    //   dataChannels[callToUsername] = { channel: event.channel };
-    // };
-
-    // openDataChannel(newRtcPeerConn, callToUsername);
-
-    // newRtcPeerConn.oniceconnectionstatechange = () => {
-    //   console.log('ICE connection state change: ', newRtcPeerConn.iceConnectionState);
-    // }
-    // end copy
-
-    // peerName = receiver; // TODO: refactor so peerName isn't available or necessary
-
     let newRtcPeerConn = getRtcPC(receiver);
 
     console.log('pre-offer newRtcPeerConn: ', newRtcPeerConn);
@@ -189,34 +155,7 @@ callBtn.addEventListener('click', () => {
 });
 
 function handleOffer(offer, name) {
-  // peerName = name; // TODO: refactor to remove module level
   let sender = name;
-
-  // let configuration = {
-  //   'iceServers': [{'urls': 'stun:stun2.1.google.com:19302'}]
-  // };
-
-  // let offerRtcPeerConn = new RTCPeerConnection(configuration);
-
-  // offerRtcPeerConn.onicecandidate = (event) => {
-  //   console.log('onicecandidate');
-  //   if(event.candidate) {
-  //     send({
-  //       type: 'candidate',
-  //       candidate: event.candidate,
-  //     });
-  //   }
-  // };
-
-  // offerRtcPeerConn.ondatachannel = (event) => {
-  //   dataChannels[peerName] = { channel: event.channel };
-  // };
-
-  // openDataChannel(offerRtcPeerConn, peerName);
-
-  // offerRtcPeerConn.oniceconnectionstatechange = () => {
-  //   console.log('ICE connection state change: ', offerRtcPeerConn.iceConnectionState);
-  // }
 
   let offerRtcPeerConn = getRtcPC(sender);
 
