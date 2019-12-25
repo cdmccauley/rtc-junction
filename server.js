@@ -33,7 +33,7 @@ wss.on('connection', (ws) => {
       data = JSON.parse(message);
     } catch (e) {
       console.log('invalid json');
-      data = {};
+      data = { error: 'invalid json' };
     }
     switch(data.type) {
       case 'login':

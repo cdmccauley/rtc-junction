@@ -12,9 +12,16 @@ signalingServer.onopen = () => {
  *  signaling server routing
  */
 signalingServer.onmessage = (event) => {
-  console.log('signaling server message: ', event.data);
+  let data;
 
-  let data = JSON.parse(event.data);
+  try {
+    data = JSON.parse(event.data);
+  } catch (e) {
+    console.log('invalid json');
+    data = {};
+  }
+
+  console.log('signaling server message: ', data);
 
   switch(data.type) {
     case 'login':
@@ -62,6 +69,13 @@ function send(message) {
   signalingServer.send(JSON.stringify(message));
 };
 
+function sendToPeer(message) {
+  if (name) {
+    message.sender = name;
+  }
+  dataChannels[message.receiver].channel.send(JSON.stringify(message));
+}
+
 function handleLogin(success) {
   if(success === false) {
     alert('username already in use, try another username');
@@ -79,7 +93,6 @@ function getRtcPC(peer) {
     let newRtcPeerConn = new RTCPeerConnection(configuration);
 
     newRtcPeerConn.onicecandidate = (event) => {
-      console.log('onicecandidate');
       if(event.candidate) {
         send({
           type: 'candidate',
@@ -91,6 +104,24 @@ function getRtcPC(peer) {
 
     newRtcPeerConn.ondatachannel = (event) => {
       dataChannels[peer] = { channel: event.channel };
+
+      // relay coding start
+
+      if(Object.keys(dataChannels).length > 1) {
+        for(let channel in dataChannels) {
+          // console.log('channel.label: ', dataChannels[channel].channel.label);
+          if(dataChannels[peer].channel.label !== dataChannels[channel].channel.label) {
+            // console.log('relay ', dataChannels[peer].channel.label, ' to ', dataChannels[channel].channel.label);
+            sendToPeer({
+              type: 'discovery',
+              peer: dataChannels[peer].channel.label,
+              receiver: dataChannels[channel].channel.label
+            })
+          }
+        };
+      };
+
+      // relay coding end
     };
 
     openDataChannel(newRtcPeerConn, peer);
@@ -100,6 +131,86 @@ function getRtcPC(peer) {
     };
 
     return newRtcPeerConn;
+};
+
+function handleDiscovery(peer, sender) {
+  if(!dataChannels[peer]) {
+    console.log('peer: ', peer, ' not found');
+    // sendToPeer({
+    //   type: 'relay',
+    //   relay: 'offer',
+    //   receiver: sender,
+    //   offer: 'offer from ' + name, // TODO: create offer; createOffer(peer, true);
+    //   peer: peer
+    // });
+
+    // inserting offer creation
+
+    // inserting peer connection creation
+    let configuration = {
+      'iceServers': [{'urls': 'stun:stun2.1.google.com:19302'}]
+    };
+
+    let newRtcPeerConn = new RTCPeerConnection(configuration);
+
+    newRtcPeerConn.onicecandidate = (event) => {
+      if(event.candidate) {
+        sendToPeer({
+          type: 'relay',
+          relay: 'candidate',
+          candidate: event.candidate,
+          receiver: sender,
+          peer: peer
+        });
+      };
+    };
+
+    newRtcPeerConn.ondatachannel = (event) => {
+      dataChannels[peer] = { channel: event.channel };
+
+      // relay coding start
+
+      if(Object.keys(dataChannels).length > 1) {
+        for(let channel in dataChannels) {
+          // console.log('channel.label: ', dataChannels[channel].channel.label);
+          if(dataChannels[peer].channel.label !== dataChannels[channel].channel.label) {
+            // console.log('relay ', dataChannels[peer].channel.label, ' to ', dataChannels[channel].channel.label);
+            sendToPeer({
+              type: 'discovery',
+              peer: dataChannels[peer].channel.label,
+              receiver: dataChannels[channel].channel.label
+            })
+          }
+        };
+      };
+
+      // relay coding end
+    };
+
+    openDataChannel(newRtcPeerConn, peer);
+
+    newRtcPeerConn.oniceconnectionstatechange = () => {
+      console.log('ICE connection state change: ', newRtcPeerConn.iceConnectionState);
+    };
+    // end peer connection insertions
+
+    newRtcPeerConn.createOffer((offer) => {
+      newRtcPeerConn.setLocalDescription(offer);
+      sendToPeer({
+        type: 'relay',
+        relay: 'offer',
+        offer: offer,
+        receiver: sender,
+        peer: peer
+      });
+    }, (error) => {
+      console.log('create offer error: ', error);
+      alert('error creating offer');
+    });
+
+    rtcPeerConns[peer] = { conn: newRtcPeerConn };
+    // end insert offer
+  };
 };
 
 function handleOffer(offer, name) {
@@ -124,6 +235,29 @@ function handleOffer(offer, name) {
   rtcPeerConns[sender] = { conn: offerRtcPeerConn };
 };
 
+function handlePeerOffer(offer, sender, peer) {
+
+  let offerRtcPeerConn = getRtcPC(peer);
+
+  offerRtcPeerConn.setRemoteDescription(new RTCSessionDescription(offer));
+
+  offerRtcPeerConn.createAnswer((answer) => {
+    offerRtcPeerConn.setLocalDescription(answer);
+    sendToPeer({
+      type: 'relay',
+      relay: 'answer',
+      answer: answer,
+      receiver: sender,
+      peer: peer
+    });
+  }, (error) => {
+    console.log('create answer error: ', error);
+    alert('error when creating answer');
+  });
+
+  rtcPeerConns[peer] = { conn: offerRtcPeerConn };
+};
+
 function handleAnswer(answer, senderName) {
   let answerPeerConn = rtcPeerConns[senderName].conn
   answerPeerConn.setRemoteDescription(new RTCSessionDescription(answer));
@@ -134,8 +268,34 @@ function handleCandidate(candidate, senderName) {
   candPeerConn.addIceCandidate(new RTCIceCandidate(candidate));
 };
 
+function handleRelay(data) {
+  let message = {}
+
+  switch(data.relay) {
+    case 'offer':
+      message.type = 'offer';
+      message.offer = data.offer;
+      break;
+    case 'answer':
+      message.type = 'answer';
+      message.answer = data.answer;
+      break;
+    case 'candidate':
+      message.type = 'candidate';
+      message.candidate = data.candidate;
+      break;
+    default:
+      break;
+  }
+
+  message.peer = data.sender;
+  message.receiver = data.peer;
+
+  sendToPeer(message);
+}
+
 function openDataChannel(peerConn, openName) {
-  newDataChannel = peerConn.createDataChannel(openName, {reliable: true});
+  newDataChannel = peerConn.createDataChannel(name, {reliable: true});
   
   console.log('data channel created: ', newDataChannel);
 
@@ -147,15 +307,40 @@ function openDataChannel(peerConn, openName) {
    *  data channel peer routing
    */
   newDataChannel.onmessage = (event) => {
-    console.log('new message received: ', event.data);
+    let data;
 
-    let data = JSON.parse(event.data);
-    
+    try {
+      data = JSON.parse(event.data);
+    } catch (e) {
+      console.log('invalid json');
+      data = {};
+    }
+
+    console.log('peer message: ', data);
+
     switch(data.type) {
       case 'message':
         chatArea.innerHTML += data.sender + ': ' + data.message + '<br />';
         break;
+      case 'discovery':
+        console.log('discovery: ', data);
+        handleDiscovery(data.peer, data.sender);
+        break;
       case 'relay':
+        console.log('relay: ', data);
+        handleRelay(data);
+        break;
+      case 'offer':
+        console.log('offer from peer route, call handlePeerOffer()');
+        handlePeerOffer(data.offer, data.sender, data.peer);
+        break;
+      case 'answer':
+        console.log('answer from peer route, call handleAnswer()');
+        handleAnswer(data.answer, data.peer);
+        break;
+      case 'candidate':
+        console.log('candidate from peer route, call handleCandidate()');
+        handleCandidate(data.candidate, data.peer);
         break;
       default:
         break;
@@ -219,8 +404,6 @@ callBtn.addEventListener('click', () => {
 
     let newRtcPeerConn = getRtcPC(receiver);
 
-    console.log('pre-offer newRtcPeerConn: ', newRtcPeerConn);
-
     newRtcPeerConn.createOffer((offer) => {
       newRtcPeerConn.setLocalDescription(offer);
       send({
@@ -233,10 +416,8 @@ callBtn.addEventListener('click', () => {
       alert('error creating offer');
     });
 
-    console.log('post-offer newRtcPeerConn: ', newRtcPeerConn);
-
     rtcPeerConns[receiver] = { conn: newRtcPeerConn };
-  }
+  };
 });
 
 hangUpBtn.addEventListener('click', () => {
