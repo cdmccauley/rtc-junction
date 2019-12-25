@@ -88,7 +88,7 @@ wss.on('connection', (ws) => {
         break;
       case 'candidate':
         // console.log('sending candidate to: ', data.name);
-        console.log('sending candidate to: ', data.receiver);
+        console.log('sending candidate to: ', data.receiver, ' from: ', data.sender);
         // conn = users[data.name];
         conn = users[data.receiver];
         if(conn != null) {

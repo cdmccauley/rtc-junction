@@ -86,6 +86,7 @@ function handleLogin(success) {
 };
 
 function getRtcPC(peer) {
+  console.log('GETTING RTCPC FROM GETRTCPC');
   let configuration = {
       'iceServers': [{'urls': 'stun:stun2.1.google.com:19302'}]
     };
@@ -94,6 +95,7 @@ function getRtcPC(peer) {
 
     newRtcPeerConn.onicecandidate = (event) => {
       if(event.candidate) {
+        console.log('SENDING CANDIDATE VIA SERVER!');
         send({
           type: 'candidate',
           candidate: event.candidate,
@@ -170,19 +172,19 @@ function handleDiscovery(peer, sender) {
 
       // relay coding start
 
-      if(Object.keys(dataChannels).length > 1) {
-        for(let channel in dataChannels) {
-          // console.log('channel.label: ', dataChannels[channel].channel.label);
-          if(dataChannels[peer].channel.label !== dataChannels[channel].channel.label) {
-            // console.log('relay ', dataChannels[peer].channel.label, ' to ', dataChannels[channel].channel.label);
-            sendToPeer({
-              type: 'discovery',
-              peer: dataChannels[peer].channel.label,
-              receiver: dataChannels[channel].channel.label
-            })
-          }
-        };
-      };
+      // if(Object.keys(dataChannels).length > 1) {
+      //   for(let channel in dataChannels) {
+      //     // console.log('channel.label: ', dataChannels[channel].channel.label);
+      //     if(dataChannels[peer].channel.label !== dataChannels[channel].channel.label) {
+      //       // console.log('relay ', dataChannels[peer].channel.label, ' to ', dataChannels[channel].channel.label);
+      //       sendToPeer({
+      //         type: 'discovery',
+      //         peer: dataChannels[peer].channel.label,
+      //         receiver: dataChannels[channel].channel.label
+      //       })
+      //     }
+      //   };
+      // };
 
       // relay coding end
     };
@@ -237,7 +239,55 @@ function handleOffer(offer, name) {
 
 function handlePeerOffer(offer, sender, peer) {
 
-  let offerRtcPeerConn = getRtcPC(peer);
+  // let offerRtcPeerConn = getRtcPC(peer);
+  // INSERT GETRTCPC CODE
+  let configuration = {
+    'iceServers': [{'urls': 'stun:stun2.1.google.com:19302'}]
+  };
+
+  let offerRtcPeerConn = new RTCPeerConnection(configuration);
+
+  offerRtcPeerConn.onicecandidate = (event) => {
+    if(event.candidate) {
+      sendToPeer({
+        type: 'relay',
+        relay: 'candidate',
+        candidate: event.candidate,
+        receiver: sender,
+        peer: peer
+      });
+    };
+  };
+
+  offerRtcPeerConn.ondatachannel = (event) => {
+    dataChannels[peer] = { channel: event.channel };
+
+    // relay coding start
+
+    // if(Object.keys(dataChannels).length > 1) {
+    //   for(let channel in dataChannels) {
+    //     // console.log('channel.label: ', dataChannels[channel].channel.label);
+    //     if(dataChannels[peer].channel.label !== dataChannels[channel].channel.label) {
+    //       // console.log('relay ', dataChannels[peer].channel.label, ' to ', dataChannels[channel].channel.label);
+    //       sendToPeer({
+    //         type: 'discovery',
+    //         peer: dataChannels[peer].channel.label,
+    //         receiver: dataChannels[channel].channel.label
+    //       })
+    //     }
+    //   };
+    // };
+
+    // relay coding end
+  };
+
+  openDataChannel(offerRtcPeerConn, peer);
+
+  offerRtcPeerConn.oniceconnectionstatechange = () => {
+    console.log('ICE connection state change: ', offerRtcPeerConn.iceConnectionState);
+  };
+
+  // END INSERT GETRTCPC CODE
 
   offerRtcPeerConn.setRemoteDescription(new RTCSessionDescription(offer));
 
@@ -366,6 +416,12 @@ function handleLeave() {
   // rtcPeerConn.onicecandidate = null;
   console.log('TODO: handleLeave()');
 };
+
+/*
+ *  peer to peer
+ */
+
+
 
 /*
  *  user interface
