@@ -172,19 +172,21 @@ function handleDiscovery(peer, sender) {
 
       // relay coding start
 
-      // if(Object.keys(dataChannels).length > 1) {
-      //   for(let channel in dataChannels) {
-      //     // console.log('channel.label: ', dataChannels[channel].channel.label);
-      //     if(dataChannels[peer].channel.label !== dataChannels[channel].channel.label) {
-      //       // console.log('relay ', dataChannels[peer].channel.label, ' to ', dataChannels[channel].channel.label);
-      //       sendToPeer({
-      //         type: 'discovery',
-      //         peer: dataChannels[peer].channel.label,
-      //         receiver: dataChannels[channel].channel.label
-      //       })
-      //     }
-      //   };
-      // };
+      setTimeout(() => {
+        if(Object.keys(dataChannels).length > 1) {
+          for(let channel in dataChannels) {
+            // console.log('channel.label: ', dataChannels[channel].channel.label);
+            if(dataChannels[peer].channel.label !== dataChannels[channel].channel.label) {
+              // console.log('relay ', dataChannels[peer].channel.label, ' to ', dataChannels[channel].channel.label);
+              sendToPeer({
+                type: 'discovery',
+                peer: dataChannels[peer].channel.label,
+                receiver: dataChannels[channel].channel.label
+              })
+            }
+          };
+        };
+      }, 1000);
 
       // relay coding end
     };
@@ -264,19 +266,21 @@ function handlePeerOffer(offer, sender, peer) {
 
     // relay coding start
 
-    // if(Object.keys(dataChannels).length > 1) {
-    //   for(let channel in dataChannels) {
-    //     // console.log('channel.label: ', dataChannels[channel].channel.label);
-    //     if(dataChannels[peer].channel.label !== dataChannels[channel].channel.label) {
-    //       // console.log('relay ', dataChannels[peer].channel.label, ' to ', dataChannels[channel].channel.label);
-    //       sendToPeer({
-    //         type: 'discovery',
-    //         peer: dataChannels[peer].channel.label,
-    //         receiver: dataChannels[channel].channel.label
-    //       })
-    //     }
-    //   };
-    // };
+    setTimeout(() => {
+      if(Object.keys(dataChannels).length > 1) {
+        for(let channel in dataChannels) {
+          // console.log('channel.label: ', dataChannels[channel].channel.label);
+          if(dataChannels[peer].channel.label !== dataChannels[channel].channel.label) {
+            // console.log('relay ', dataChannels[peer].channel.label, ' to ', dataChannels[channel].channel.label);
+            sendToPeer({
+              type: 'discovery',
+              peer: dataChannels[peer].channel.label,
+              receiver: dataChannels[channel].channel.label
+            })
+          }
+        };
+      };
+    }, 1000);
 
     // relay coding end
   };
