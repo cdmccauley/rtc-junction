@@ -12,9 +12,16 @@ signalingServer.onopen = () => {
  *  signaling server routing
  */
 signalingServer.onmessage = (event) => {
-  console.log('signaling server message: ', event.data);
+  let data;
 
-  let data = JSON.parse(event.data);
+  try {
+    data = JSON.parse(event.data);
+  } catch(e) {
+    console.log('invalid json');
+    data = {};
+  }
+
+  console.log('signaling server message: ', data);
 
   switch(data.type) {
     case 'login':
@@ -62,6 +69,13 @@ function send(message) {
   signalingServer.send(JSON.stringify(message));
 };
 
+function sendToPeer(message) {
+  if(name) {
+    message.sender = name;
+  }
+  dataChannels[message.receiver].channel.send(JSON.stringify(message));
+}
+
 function handleLogin(success) {
   if(success === false) {
     alert('username already in use, try another username');
@@ -78,8 +92,7 @@ function getRtcPC(peer) {
 
     let newRtcPeerConn = new RTCPeerConnection(configuration);
 
-    newRtcPeerConn.onicecandidate = (event) => {
-      console.log('onicecandidate');
+        newRtcPeerConn.onicecandidate = (event) => {
       if(event.candidate) {
         send({
           type: 'candidate',
@@ -90,14 +103,26 @@ function getRtcPC(peer) {
     };
 
     newRtcPeerConn.ondatachannel = (event) => {
+      let peers;
+      if(Object.keys(dataChannels).length > 1) {
+        delete dataChannels[peer];
+        peers = Object.keys(dataChannels);
+      }
       dataChannels[peer] = { channel: event.channel };
+      if(peers) {
+        sendToPeer({
+          type: 'peers',
+          peers: peers,
+          receiver: event.channel.label
+        });
+      };
     };
 
     openDataChannel(newRtcPeerConn, peer);
 
-    newRtcPeerConn.oniceconnectionstatechange = () => {
-      console.log('ICE connection state change: ', newRtcPeerConn.iceConnectionState);
-    };
+    // newRtcPeerConn.oniceconnectionstatechange = () => {
+    //   console.log('ICE connection state change: ', newRtcPeerConn.iceConnectionState);
+    // };
 
     return newRtcPeerConn;
 };
@@ -135,9 +160,9 @@ function handleCandidate(candidate, senderName) {
 };
 
 function openDataChannel(peerConn, openName) {
-  newDataChannel = peerConn.createDataChannel(openName, {reliable: true});
+  newDataChannel = peerConn.createDataChannel(name, {reliable: true});
   
-  console.log('data channel created: ', newDataChannel);
+  // console.log('data channel created: ', newDataChannel);
 
   newDataChannel.onerror = (error) => {
     console.log('datachannel error: ', error);
@@ -147,27 +172,35 @@ function openDataChannel(peerConn, openName) {
    *  data channel peer routing
    */
   newDataChannel.onmessage = (event) => {
-    console.log('new message received: ', event.data);
+    let data;
 
-    let data = JSON.parse(event.data);
+    try {
+      data = JSON.parse(event.data);
+    } catch(e) {
+      console.log('invalid json');
+      data = {};
+    }
+
+    console.log('peer message: ', data);
     
     switch(data.type) {
       case 'message':
         chatArea.innerHTML += data.sender + ': ' + data.message + '<br />';
         break;
-      case 'relay':
+      case 'peers':
+        console.log('peers: ', data.peers, '\ncall handlePeers(data.peers)');
         break;
       default:
         break;
     };
   };
 
-  newDataChannel.onopen = (event) => {
-    console.log('datachannel open');
+  newDataChannel.onopen = () => {
     newDataChannel.established = new Date();
-  }
+    // console.log('datachannel open: ', newDataChannel);
+  };
 
-  newDataChannel.onclose = (event) => {
+  newDataChannel.onclose = () => {
     console.log('datachannel closed (duration: ', new Date() - newDataChannel.established, 'ms)');
   };
 
@@ -219,8 +252,6 @@ callBtn.addEventListener('click', () => {
 
     let newRtcPeerConn = getRtcPC(receiver);
 
-    console.log('pre-offer newRtcPeerConn: ', newRtcPeerConn);
-
     newRtcPeerConn.createOffer((offer) => {
       newRtcPeerConn.setLocalDescription(offer);
       send({
@@ -232,8 +263,6 @@ callBtn.addEventListener('click', () => {
       console.log('create offer error: ', error);
       alert('error creating offer');
     });
-
-    console.log('post-offer newRtcPeerConn: ', newRtcPeerConn);
 
     rtcPeerConns[receiver] = { conn: newRtcPeerConn };
   }
@@ -250,6 +279,7 @@ sendMsgBtn.addEventListener('click', (event) => {
   let val = msgInput.value;
   chatArea.innerHTML += name + ': ' + val + '<br />';
   for(let channel in dataChannels) {
+    // if user called peer that doesn't exist this will throw
     dataChannels[channel].channel.send(JSON.stringify({
       type: 'message',
       sender: name,

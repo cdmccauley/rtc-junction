@@ -40,7 +40,7 @@ wss.on('connection', (ws) => {
         // console.log('user login: ', data.name);
         console.log('user login: ', data.sender);
         // if (users[data.name]) {
-        if (users[data.sender]) {
+        if (users[data.sender] || data.sender === 'server') {
           sendTo(ws, {
             type: 'login',
             success: false
@@ -137,7 +137,7 @@ wss.on('connection', (ws) => {
   });
 
   sendTo(ws, {
-    type: 'log',
+    type: 'server',
     message: 'connected to server'
   });
 
@@ -148,8 +148,8 @@ function sendTo(connection, message) {
 }
 
 let keepAlive = {
-  type: 'log',
-  message: 'ping from server'
+  type: 'server',
+  message: 'ping'
 }
 
 // keepalive
