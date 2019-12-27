@@ -88,13 +88,29 @@ function setPeerConn(conn, peer) {
   rtcPeerConns[peer].conn = conn;
 };
 
-// once setDataChannel finishes comm can start
+// once setDataChannel finishes comm can start, can also be used for new channels
 function setDataChannel(channel, peer) {
   if (rtcPeerConns[peer].channel) {
-    // rtcPeerConns[peer].relay = channel;
+    rtcPeerConns[peer].relay = channel;
+
+
+    // relay work here
+    // notes: with the ability to add channels the routing can be removed from the onmessage
+    // then each channel can be designated for a separate comm type and used for that
+    console.log('relay channel stored');
+    rtcPeerConns[peer].relay.send(JSON.stringify({
+      type: 'message',
+      message: 'relay from ' + name,
+      sender: name
+    }));
+    // notes: after storing the channel can call openDataChannel to create another channel
+    // then store the channel in this method and call for another till all channels are created
+
+
   } else {
     rtcPeerConns[peer].channel = channel;
     // create relay
+    openDataChannel(rtcPeerConns[peer].conn);
   };
 };
 
