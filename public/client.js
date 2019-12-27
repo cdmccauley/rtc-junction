@@ -60,7 +60,7 @@ signalingServer.onclose = () => {
 let name;
 
 let rtcPeerConns = {};
-let dataChannels = {};
+// let dataChannels = {};
 
 function send(message) {
   if (name) {
@@ -73,7 +73,8 @@ function sendToPeer(message) {
   if(name) {
     message.sender = name;
   }
-  dataChannels[message.receiver].channel.send(JSON.stringify(message));
+  // dataChannels[message.receiver].channel.send(JSON.stringify(message));
+  rtcPeerConns[message.receiver].channel.send(JSON.stringify(message));
 }
 
 function handleLogin(success) {
@@ -84,6 +85,23 @@ function handleLogin(success) {
     callPage.style.display = 'block';
   }
 };
+
+// handle setting conns and channels
+
+function setPeerConn(conn, peer) {
+  rtcPeerConns[peer].conn = conn;
+}
+
+function setDataChannel(channel, peer) {
+  // dataChannels[peer] = { channel: channel };
+  // if (dataChannels[peer].channel) {
+  //   // console.log('dataChannels[', peer, '].channel: exists');
+  // }
+  rtcPeerConns[peer].channel = channel;
+  console.log('post channel creation rtcPeerConns: ', rtcPeerConns[peer]);
+}
+
+// end handle setting
 
 function getRtcPC(peer) {
   let configuration = {
@@ -104,11 +122,12 @@ function getRtcPC(peer) {
 
     newRtcPeerConn.ondatachannel = (event) => {
       let peers;
-      if(Object.keys(dataChannels).length > 1) {
-        delete dataChannels[peer];
-        peers = Object.keys(dataChannels);
-      }
-      dataChannels[peer] = { channel: event.channel };
+      // if(Object.keys(dataChannels).length > 1) {
+      //   delete dataChannels[peer];
+      //   peers = Object.keys(dataChannels);
+      // }
+      setDataChannel(event.channel, peer);
+      // dataChannels[peer] = { channel: event.channel };
       if(peers) {
         sendToPeer({
           type: 'peers',
@@ -204,7 +223,7 @@ function openDataChannel(peerConn, openName) {
     console.log('datachannel closed (duration: ', new Date() - newDataChannel.established, 'ms)');
   };
 
-  dataChannels[openName] = { channel: newDataChannel };
+  // dataChannels[openName] = { channel: newDataChannel };
   
 };
 
@@ -278,9 +297,9 @@ hangUpBtn.addEventListener('click', () => {
 sendMsgBtn.addEventListener('click', (event) => {
   let val = msgInput.value;
   chatArea.innerHTML += name + ': ' + val + '<br />';
-  for(let channel in dataChannels) {
+  for(let peer in rtcPeerConns) {
     // if user called peer that doesn't exist this will throw
-    dataChannels[channel].channel.send(JSON.stringify({
+    rtcPeerConns[peer].channel.send(JSON.stringify({
       type: 'message',
       sender: name,
       message: val
