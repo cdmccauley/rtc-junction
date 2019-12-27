@@ -60,7 +60,6 @@ signalingServer.onclose = () => {
 let name;
 
 let rtcPeerConns = {};
-// let dataChannels = {};
 
 function send(message) {
   if (name) {
@@ -73,7 +72,6 @@ function sendToPeer(message) {
   if(name) {
     message.sender = name;
   }
-  // dataChannels[message.receiver].channel.send(JSON.stringify(message));
   rtcPeerConns[message.receiver].channel.send(JSON.stringify(message));
 }
 
@@ -86,75 +84,56 @@ function handleLogin(success) {
   }
 };
 
-// handle setting conns and channels
-
 function setPeerConn(conn, peer) {
   rtcPeerConns[peer].conn = conn;
-}
+};
 
+// once setDataChannel finishes comm can start
 function setDataChannel(channel, peer) {
-  // dataChannels[peer] = { channel: channel };
-  // if (dataChannels[peer].channel) {
-  //   // console.log('dataChannels[', peer, '].channel: exists');
-  // }
-  rtcPeerConns[peer].channel = channel;
-  console.log('post channel creation rtcPeerConns: ', rtcPeerConns[peer]);
-}
-
-// end handle setting
+  if (rtcPeerConns[peer].channel) {
+    // rtcPeerConns[peer].relay = channel;
+  } else {
+    rtcPeerConns[peer].channel = channel;
+    // create relay
+  };
+};
 
 function getRtcPC(peer) {
   let configuration = {
-      'iceServers': [{'urls': 'stun:stun2.1.google.com:19302'}]
+    'iceServers': [{'urls': 'stun:stun2.1.google.com:19302'}]
+  };
+
+  let newRtcPeerConn = new RTCPeerConnection(configuration);
+
+  // uses signaling server for icecandidate, move to function, create peer counterpart
+  newRtcPeerConn.onicecandidate = (event) => {
+    if(event.candidate) {
+      send({
+        type: 'candidate',
+        candidate: event.candidate,
+        receiver: peer
+      });
     };
+  };
+  // ------------------------------------------
 
-    let newRtcPeerConn = new RTCPeerConnection(configuration);
+  newRtcPeerConn.ondatachannel = (event) => {
+    setDataChannel(event.channel, peer);
+  };
 
-        newRtcPeerConn.onicecandidate = (event) => {
-      if(event.candidate) {
-        send({
-          type: 'candidate',
-          candidate: event.candidate,
-          receiver: peer
-        });
-      };
-    };
+  openDataChannel(newRtcPeerConn);
 
-    newRtcPeerConn.ondatachannel = (event) => {
-      let peers;
-      // if(Object.keys(dataChannels).length > 1) {
-      //   delete dataChannels[peer];
-      //   peers = Object.keys(dataChannels);
-      // }
-      setDataChannel(event.channel, peer);
-      // dataChannels[peer] = { channel: event.channel };
-      if(peers) {
-        sendToPeer({
-          type: 'peers',
-          peers: peers,
-          receiver: event.channel.label
-        });
-      };
-    };
-
-    openDataChannel(newRtcPeerConn, peer);
-
-    // newRtcPeerConn.oniceconnectionstatechange = () => {
-    //   console.log('ICE connection state change: ', newRtcPeerConn.iceConnectionState);
-    // };
-
-    return newRtcPeerConn;
+  rtcPeerConns[peer] = { conn: newRtcPeerConn };
 };
 
-function handleOffer(offer, name) {
-  let sender = name;
+function handleOffer(offer, sender) {
+  getRtcPC(sender);
 
-  let offerRtcPeerConn = getRtcPC(sender);
+  rtcPeerConns[sender].conn.setRemoteDescription(new RTCSessionDescription(offer));
 
-  offerRtcPeerConn.setRemoteDescription(new RTCSessionDescription(offer));
-
-  offerRtcPeerConn.createAnswer((answer) => {
-    offerRtcPeerConn.setLocalDescription(answer);
+  // uses signaling server for answer, move to function, create peer counterpart
+  rtcPeerConns[sender].conn.createAnswer((answer) => {
+    rtcPeerConns[sender].conn.setLocalDescription(answer);
     send({
       type: 'answer',
       answer: answer,
@@ -164,24 +143,21 @@ function handleOffer(offer, name) {
     console.log('create answer error: ', error);
     alert('error when creating answer');
   });
+  // -----------------------------------------------------------
 
-  rtcPeerConns[sender] = { conn: offerRtcPeerConn };
 };
 
-function handleAnswer(answer, senderName) {
-  let answerPeerConn = rtcPeerConns[senderName].conn
-  answerPeerConn.setRemoteDescription(new RTCSessionDescription(answer));
+function handleAnswer(answer, sender) {
+  rtcPeerConns[sender].conn.setRemoteDescription(new RTCSessionDescription(answer));
 };
 
-function handleCandidate(candidate, senderName) {
-  let candPeerConn = rtcPeerConns[senderName].conn
-  candPeerConn.addIceCandidate(new RTCIceCandidate(candidate));
+function handleCandidate(candidate, sender) {
+  rtcPeerConns[sender].conn.addIceCandidate(new RTCIceCandidate(candidate));
 };
 
-function openDataChannel(peerConn, openName) {
-  newDataChannel = peerConn.createDataChannel(name, {reliable: true});
-  
-  // console.log('data channel created: ', newDataChannel);
+// creating client data channel, recieves messages from peer (local representation of channel)
+function openDataChannel(conn) {
+  newDataChannel = conn.createDataChannel(name, {reliable: true});
 
   newDataChannel.onerror = (error) => {
     console.log('datachannel error: ', error);
@@ -216,15 +192,11 @@ function openDataChannel(peerConn, openName) {
 
   newDataChannel.onopen = () => {
     newDataChannel.established = new Date();
-    // console.log('datachannel open: ', newDataChannel);
   };
 
   newDataChannel.onclose = () => {
     console.log('datachannel closed (duration: ', new Date() - newDataChannel.established, 'ms)');
   };
-
-  // dataChannels[openName] = { channel: newDataChannel };
-  
 };
 
 function handleLeave() {
@@ -265,14 +237,16 @@ loginBtn.addEventListener('click', (event) => {
 });
 
 callBtn.addEventListener('click', () => {
+  // ask server and/or peers if user exists before creating the rtcpc
   let receiver = callToUsernameInput.value;
 
   if(receiver.length > 0) {
 
-    let newRtcPeerConn = getRtcPC(receiver);
+    getRtcPC(receiver);
 
-    newRtcPeerConn.createOffer((offer) => {
-      newRtcPeerConn.setLocalDescription(offer);
+    // sends to signaling server, move to function, create peer counterpart
+    rtcPeerConns[receiver].conn.createOffer((offer) => {
+      rtcPeerConns[receiver].conn.setLocalDescription(offer);
       send({
         type: 'offer',
         offer: offer,
@@ -282,9 +256,9 @@ callBtn.addEventListener('click', () => {
       console.log('create offer error: ', error);
       alert('error creating offer');
     });
+    // -------------------------------------------
 
-    rtcPeerConns[receiver] = { conn: newRtcPeerConn };
-  }
+  };
 });
 
 hangUpBtn.addEventListener('click', () => {
