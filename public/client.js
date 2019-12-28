@@ -72,7 +72,7 @@ function sendToPeer(message) {
   if(name) {
     message.sender = name;
   }
-  rtcPeerConns[message.receiver].channel.send(JSON.stringify(message));
+  rtcPeerConns[message.receiver].relay.remote.send(JSON.stringify(message));
 }
 
 function handleLogin(success) {
@@ -84,34 +84,42 @@ function handleLogin(success) {
   }
 };
 
-function setPeerConn(conn, peer) {
-  rtcPeerConns[peer].conn = conn;
+function peerDiscovery(relay) {
+  /*
+      at least one peer has a relay channel set
+      goal is to set up another peer and call again when they have a relay set up
+      need to get a list of peers or a peer to connect to
+
+      ask for peers array
+      compare each name to rtcpeerconn
+      if match then pop/delete
+      if no match then discard and start
+      when process is complete another list will be created
+
+      send an introduction to new peer
+      new peer will broadcast intro
+
+      thoughts:
+      what if a peer gets another connection after names are recieved and before a peer is finished
+   */
+  console.log(relay);
+  sendToPeer({
+    type: 'discovery',
+    receiver: relay.label,
+  });
 };
 
-// once setDataChannel finishes comm can start, can also be used for new channels
 function setDataChannel(channel, peer) {
-  if (rtcPeerConns[peer].channel) {
-    rtcPeerConns[peer].relay = channel;
-
-
-    // relay work here
-    // notes: with the ability to add channels the routing can be removed from the onmessage
-    // then each channel can be designated for a separate comm type and used for that
-    console.log('relay channel stored');
-    rtcPeerConns[peer].relay.send(JSON.stringify({
-      type: 'message',
-      message: 'relay from ' + name,
-      sender: name
-    }));
-    // notes: after storing the channel can call openDataChannel to create another channel
-    // then store the channel in this method and call for another till all channels are created
-
-
+  if (rtcPeerConns[peer].channel.remote) {
+    rtcPeerConns[peer].relay.remote = channel;
+    // look for more peers
+    peerDiscovery(channel);
   } else {
-    rtcPeerConns[peer].channel = channel;
+    rtcPeerConns[peer].channel.remote = channel;
     // create relay
     openDataChannel(rtcPeerConns[peer].conn);
   };
+  // possible to create and store more channels here
 };
 
 function getRtcPC(peer) {
@@ -120,6 +128,9 @@ function getRtcPC(peer) {
   };
 
   let newRtcPeerConn = new RTCPeerConnection(configuration);
+
+  // store property for id
+  newRtcPeerConn.peer = peer;
 
   // uses signaling server for icecandidate, move to function, create peer counterpart
   newRtcPeerConn.onicecandidate = (event) => {
@@ -139,7 +150,7 @@ function getRtcPC(peer) {
 
   openDataChannel(newRtcPeerConn);
 
-  rtcPeerConns[peer] = { conn: newRtcPeerConn };
+  rtcPeerConns[peer].conn = newRtcPeerConn;
 };
 
 function handleOffer(offer, sender) {
@@ -171,18 +182,8 @@ function handleCandidate(candidate, sender) {
   rtcPeerConns[sender].conn.addIceCandidate(new RTCIceCandidate(candidate));
 };
 
-// creating client data channel, recieves messages from peer (local representation of channel)
-function openDataChannel(conn) {
-  newDataChannel = conn.createDataChannel(name, {reliable: true});
-
-  newDataChannel.onerror = (error) => {
-    console.log('datachannel error: ', error);
-  }
-
-  /*
-   *  data channel peer routing
-   */
-  newDataChannel.onmessage = (event) => {
+function addChannelRouting(channel) {
+  channel.onmessage = (event) => {
     let data;
 
     try {
@@ -192,19 +193,48 @@ function openDataChannel(conn) {
       data = {};
     }
 
-    console.log('peer message: ', data);
+    console.log('channel message: ', data);
     
     switch(data.type) {
       case 'message':
         chatArea.innerHTML += data.sender + ': ' + data.message + '<br />';
         break;
-      case 'peers':
-        console.log('peers: ', data.peers, '\ncall handlePeers(data.peers)');
+      default:
+        break;
+    };
+  };
+};
+
+function addRelayRouting(channel) {
+  channel.onmessage = (event) => {
+    let data;
+
+    try {
+      data = JSON.parse(event.data);
+    } catch(e) {
+      console.log('invalid json');
+      data = {};
+    }
+
+    console.log('relay message: ', data);
+    
+    switch(data.type) {
+      case 'discovery':
+
         break;
       default:
         break;
     };
   };
+}
+
+// creating client data channel, recieves messages from peer (local representation of channel)
+function openDataChannel(conn) {
+  newDataChannel = conn.createDataChannel(name, {reliable: true});
+
+  newDataChannel.onerror = (error) => {
+    console.log('datachannel error: ', error);
+  }
 
   newDataChannel.onopen = () => {
     newDataChannel.established = new Date();
@@ -213,6 +243,21 @@ function openDataChannel(conn) {
   newDataChannel.onclose = () => {
     console.log('datachannel closed (duration: ', new Date() - newDataChannel.established, 'ms)');
   };
+
+  let localChannel = { local: newDataChannel };
+
+  // add references to local datachannels
+  if(rtcPeerConns[conn.peer] === undefined) {
+    // first channel, provide channel type handler
+    addChannelRouting(localChannel.local);
+    // store as channel.local
+    rtcPeerConns[conn.peer] = { channel: localChannel };
+  } else if(rtcPeerConns[conn.peer].relay === undefined) {
+    // second channel, provide relay type handler
+    addRelayRouting(localChannel.local);
+    // store as relay.local
+    rtcPeerConns[conn.peer].relay = localChannel;
+  }
 };
 
 function handleLeave() {
@@ -289,7 +334,7 @@ sendMsgBtn.addEventListener('click', (event) => {
   chatArea.innerHTML += name + ': ' + val + '<br />';
   for(let peer in rtcPeerConns) {
     // if user called peer that doesn't exist this will throw
-    rtcPeerConns[peer].channel.send(JSON.stringify({
+    rtcPeerConns[peer].channel.remote.send(JSON.stringify({
       type: 'message',
       sender: name,
       message: val
