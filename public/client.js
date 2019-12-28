@@ -9,7 +9,9 @@ signalingServer.onopen = () => {
 }
 
 /*
+ *
  *  signaling server routing
+ * 
  */
 signalingServer.onmessage = (event) => {
   let data;
@@ -28,7 +30,7 @@ signalingServer.onmessage = (event) => {
       handleLogin(data.success);
       break;
     case 'offer':
-      handleOffer(data.offer, data.sender);
+      handleServerOffer(data.offer, data.sender);
       break;
     case 'answer':
       handleAnswer(data.answer, data.sender);
@@ -55,19 +57,29 @@ signalingServer.onclose = () => {
 };
 
 /*
+ *
  *  functions
+ * 
  */
-let name;
 
+// declarations
+let name;
+let peers = [];
 let rtcPeerConns = {};
 
-function send(message) {
+/*
+ *  attach name and condition server message
+ */
+function sendToServer(message) {
   if (name) {
     message.sender = name;
   }
   signalingServer.send(JSON.stringify(message));
 };
 
+/*
+ *  attach name and condition peer message
+ */
 function sendToPeer(message) {
   if(name) {
     message.sender = name;
@@ -75,113 +87,9 @@ function sendToPeer(message) {
   rtcPeerConns[message.receiver].relay.remote.send(JSON.stringify(message));
 }
 
-function handleLogin(success) {
-  if(success === false) {
-    alert('username already in use, try another username');
-  } else {
-    loginPage.style.display = 'none';
-    callPage.style.display = 'block';
-  }
-};
-
-function peerDiscovery(relay) {
-  /*
-      at least one peer has a relay channel set
-      goal is to set up another peer and call again when they have a relay set up
-      need to get a list of peers or a peer to connect to
-
-      ask for peers array
-      compare each name to rtcpeerconn
-      if match then pop/delete
-      if no match then discard and start
-      when process is complete another list will be created
-
-      send an introduction to new peer
-      new peer will broadcast intro
-
-      thoughts:
-      what if a peer gets another connection after names are recieved and before a peer is finished
-   */
-  console.log(relay);
-  sendToPeer({
-    type: 'discovery',
-    receiver: relay.label,
-  });
-};
-
-function setDataChannel(channel, peer) {
-  if (rtcPeerConns[peer].channel.remote) {
-    rtcPeerConns[peer].relay.remote = channel;
-    // look for more peers
-    peerDiscovery(channel);
-  } else {
-    rtcPeerConns[peer].channel.remote = channel;
-    // create relay
-    openDataChannel(rtcPeerConns[peer].conn);
-  };
-  // possible to create and store more channels here
-};
-
-function getRtcPC(peer) {
-  let configuration = {
-    'iceServers': [{'urls': 'stun:stun2.1.google.com:19302'}]
-  };
-
-  let newRtcPeerConn = new RTCPeerConnection(configuration);
-
-  // store property for id
-  newRtcPeerConn.peer = peer;
-
-  // uses signaling server for icecandidate, move to function, create peer counterpart
-  newRtcPeerConn.onicecandidate = (event) => {
-    if(event.candidate) {
-      send({
-        type: 'candidate',
-        candidate: event.candidate,
-        receiver: peer
-      });
-    };
-  };
-  // ------------------------------------------
-
-  newRtcPeerConn.ondatachannel = (event) => {
-    setDataChannel(event.channel, peer);
-  };
-
-  openDataChannel(newRtcPeerConn);
-
-  rtcPeerConns[peer].conn = newRtcPeerConn;
-};
-
-function handleOffer(offer, sender) {
-  getRtcPC(sender);
-
-  rtcPeerConns[sender].conn.setRemoteDescription(new RTCSessionDescription(offer));
-
-  // uses signaling server for answer, move to function, create peer counterpart
-  rtcPeerConns[sender].conn.createAnswer((answer) => {
-    rtcPeerConns[sender].conn.setLocalDescription(answer);
-    send({
-      type: 'answer',
-      answer: answer,
-      receiver: sender
-    });
-  }, (error) => {
-    console.log('create answer error: ', error);
-    alert('error when creating answer');
-  });
-  // -----------------------------------------------------------
-
-};
-
-function handleAnswer(answer, sender) {
-  rtcPeerConns[sender].conn.setRemoteDescription(new RTCSessionDescription(answer));
-};
-
-function handleCandidate(candidate, sender) {
-  rtcPeerConns[sender].conn.addIceCandidate(new RTCIceCandidate(candidate));
-};
-
+/*
+ *
+ */
 function addChannelRouting(channel) {
   channel.onmessage = (event) => {
     let data;
@@ -205,6 +113,9 @@ function addChannelRouting(channel) {
   };
 };
 
+/*
+ *
+ */
 function addRelayRouting(channel) {
   channel.onmessage = (event) => {
     let data;
@@ -220,15 +131,160 @@ function addRelayRouting(channel) {
     
     switch(data.type) {
       case 'discovery':
-
+        handleDiscovery(data.sender);
+        break;
+      case 'peers':
+        handlePeers(data.data, data.sender);
         break;
       default:
         break;
     };
   };
+};
+
+/*
+ *
+ */
+function handlePeers(candidates, sender) {
+  for(let candidate of candidates) {
+    if(candidate !== name && !peers.includes(candidate)) {
+      console.log('start connection with ', candidate, ' via ', sender);
+      /*
+          TODO:
+          need p2p call that calls getrtcpc then mirrors callbtn click
+          need handlePeerOffer that mirrors handleServerOffer
+      */
+      break;
+    };
+  };
+};
+
+/*
+ *
+ */
+function handleDiscovery(peer) {
+  sendToPeer({
+    type: 'peers',
+    data: peers,
+    receiver: peer
+  })
 }
 
-// creating client data channel, recieves messages from peer (local representation of channel)
+/*
+ *  handles dom reaction to login response from server
+ */
+function handleLogin(success) {
+  if(success === false) {
+    alert('username already in use, try another username');
+  } else {
+    loginPage.style.display = 'none';
+    callPage.style.display = 'block';
+  }
+};
+
+/*
+ *
+ */
+function peerDiscovery(peer) {
+  
+  sendToPeer({
+    type: 'discovery',
+    receiver: peer,
+  });
+};
+
+/*
+ *
+ */
+function setDataChannel(channel, peer) {
+  if (rtcPeerConns[peer].channel.remote) {
+    rtcPeerConns[peer].relay.remote = channel;
+    // look for more peers
+    peerDiscovery(peer);
+  } else {
+    rtcPeerConns[peer].channel.remote = channel;
+    // record peer
+    peers.push(peer);
+    // create relay
+    openDataChannel(rtcPeerConns[peer].conn);
+  };
+  // possible to create and store more channels here
+};
+
+/*
+ *
+ */
+function getRtcPC(peer) {
+  let configuration = {
+    'iceServers': [{'urls': 'stun:stun2.1.google.com:19302'}]
+  };
+
+  let newRtcPeerConn = new RTCPeerConnection(configuration);
+
+  // store property for id
+  newRtcPeerConn.peer = peer;
+
+  newRtcPeerConn.ondatachannel = (event) => {
+    setDataChannel(event.channel, peer);
+  };
+
+  openDataChannel(newRtcPeerConn);
+
+  rtcPeerConns[peer].conn = newRtcPeerConn;
+};
+
+/*
+ *  handles offers coming from the signaling server
+ *  TODO: create handlePeerOffer() that mirrors
+ */
+function handleServerOffer(offer, sender) {
+  getRtcPC(sender);
+
+  rtcPeerConns[sender].conn.onicecandidate = (event) => {
+    if(event.candidate) {
+      sendToServer({
+        type: 'candidate',
+        candidate: event.candidate,
+        receiver: sender
+      });
+    };
+  };
+
+  rtcPeerConns[sender].conn.setRemoteDescription(new RTCSessionDescription(offer));
+
+  rtcPeerConns[sender].conn.createAnswer((answer) => {
+    rtcPeerConns[sender].conn.setLocalDescription(answer);
+    sendToServer({
+      type: 'answer',
+      answer: answer,
+      receiver: sender
+    });
+  }, (error) => {
+    console.log('create answer error: ', error);
+    alert('error when creating answer');
+  });
+
+};
+
+/*
+ *
+ */
+function handleAnswer(answer, sender) {
+  rtcPeerConns[sender].conn.setRemoteDescription(new RTCSessionDescription(answer));
+};
+
+/*
+ *
+ */
+function handleCandidate(candidate, sender) {
+  rtcPeerConns[sender].conn.addIceCandidate(new RTCIceCandidate(candidate));
+};
+
+
+
+/*
+ *  creating client data channel, recieves messages from peer (local representation of channel)
+ */
 function openDataChannel(conn) {
   newDataChannel = conn.createDataChannel(name, {reliable: true});
 
@@ -260,6 +316,43 @@ function openDataChannel(conn) {
   }
 };
 
+/*
+ *  configures rtcpeerconnection for negotiation through peer
+ */
+function setPeerRtcPC(peer, relay) {
+
+}
+
+/*
+ *  configures rtcpeerconnection for negotiation through server
+ */
+function setServerRtcPC(peer) {
+  rtcPeerConns[peer].conn.onicecandidate = (event) => {
+    if(event.candidate) {
+      sendToServer({
+        type: 'candidate',
+        candidate: event.candidate,
+        receiver: peer
+      });
+    };
+  };
+
+  rtcPeerConns[peer].conn.createOffer((offer) => {
+    rtcPeerConns[peer].conn.setLocalDescription(offer);
+    sendToServer({
+      type: 'offer',
+      offer: offer,
+      receiver: peer
+    });
+  }, (error) => {
+    console.log('create offer error: ', error);
+    alert('error creating offer');
+  });
+}
+
+/*
+ *
+ */
 function handleLeave() {
   // peerName = null;
   // rtcPeerConn.close();
@@ -268,9 +361,10 @@ function handleLeave() {
 };
 
 /*
+ *
  *  user interface
+ * 
  */
-
 let loginPage = document.querySelector('#loginPage');
 let usernameInput = document.querySelector('#usernameInput');
 let loginBtn = document.querySelector('#loginBtn');
@@ -291,39 +385,24 @@ loginBtn.addEventListener('click', (event) => {
   name = usernameInput.value;
 
   if(name.length > 0) {
-    send({
+    sendToServer({
       type: 'login',
     });
   };
 });
 
+// TODO: change to ask server if user is reachable, then move the function calls to a new server response handler
 callBtn.addEventListener('click', () => {
-  // ask server and/or peers if user exists before creating the rtcpc
   let receiver = callToUsernameInput.value;
 
   if(receiver.length > 0) {
-
     getRtcPC(receiver);
-
-    // sends to signaling server, move to function, create peer counterpart
-    rtcPeerConns[receiver].conn.createOffer((offer) => {
-      rtcPeerConns[receiver].conn.setLocalDescription(offer);
-      send({
-        type: 'offer',
-        offer: offer,
-        receiver: receiver
-      });
-    }, (error) => {
-      console.log('create offer error: ', error);
-      alert('error creating offer');
-    });
-    // -------------------------------------------
-
+    setServerRtcPC(receiver);
   };
 });
 
 hangUpBtn.addEventListener('click', () => {
-  send({
+  sendToServer({
     type: 'leave'
   });
   handleLeave();
