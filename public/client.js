@@ -136,6 +136,24 @@ function addRelayRouting(channel) {
       case 'peers':
         handlePeers(data.data, data.sender);
         break;
+      case 'relay':
+        handleRelay(data);
+        break;
+      // case 'call':
+      //   handleCall(data);
+      //   break;
+      case 'offer':
+        console.log('calling handlePeerOffer: ', data);
+        handlePeerOffer(data.offer, data.peer, data.sender);
+        break;
+      case 'answer':
+        console.log('calling handleAnswer: ', data);
+        handleAnswer(data.answer, data.peer);
+        break;
+      case 'candidate':
+        console.log('calling handleCandidate: ', data);
+        handleCandidate(data.candidate, data.peer);
+        break;
       default:
         break;
     };
@@ -145,15 +163,49 @@ function addRelayRouting(channel) {
 /*
  *
  */
+// function handleCall(data) {
+//   console.log('initate call with ', data.peer);
+// }
+
+/*
+ *
+ */
+function handleRelay(data) {
+  // sendToPeer({
+  //   type: data.relay,
+  //   data: data.data,
+  //   receiver: data.peer,
+  //   peer: data.sender
+  // })
+  data.type = data.relay;
+  data.receiver = data.peer;
+  data.peer = data.sender
+  sendToPeer(data);
+}
+
+/*
+ *
+ */
 function handlePeers(candidates, sender) {
   for(let candidate of candidates) {
     if(candidate !== name && !peers.includes(candidate)) {
-      console.log('start connection with ', candidate, ' via ', sender);
       /*
           TODO:
           need p2p call that calls getrtcpc then mirrors callbtn click
           need handlePeerOffer that mirrors handleServerOffer
       */
+      // organize this
+      // start local conn and channels
+      getRtcPC(candidate);
+      setPeerRtcPC(candidate, sender);
+      // sendToPeer({
+      //   type: 'relay',
+      //   relay: 'call',
+      //   data: 'some data',
+      //   receiver: sender,
+      //   peer: candidate
+      // });
+      // --------------
       break;
     };
   };
@@ -186,7 +238,6 @@ function handleLogin(success) {
  *
  */
 function peerDiscovery(peer) {
-  
   sendToPeer({
     type: 'discovery',
     receiver: peer,
@@ -232,6 +283,41 @@ function getRtcPC(peer) {
 
   rtcPeerConns[peer].conn = newRtcPeerConn;
 };
+
+/*
+ *
+ */
+function handlePeerOffer(offer, peer, sender) {
+  getRtcPC(peer);
+
+  rtcPeerConns[peer].conn.onicecandidate = (event) => {
+    if(event.candidate) {
+      sendToPeer({
+        type: 'relay',
+        relay: 'candidate',
+        candidate: event.candidate,
+        receiver: sender,
+        peer: peer
+      });
+    };
+  };
+
+  rtcPeerConns[peer].conn.setRemoteDescription(new RTCSessionDescription(offer));
+
+  rtcPeerConns[peer].conn.createAnswer((answer) => {
+    rtcPeerConns[peer].conn.setLocalDescription(answer);
+    sendToPeer({
+      type: 'relay',
+      relay: 'answer',
+      answer: answer,
+      receiver: sender,
+      peer: peer
+    });
+  }, (error) => {
+    console.log('create answer error: ', error);
+    alert('error when creating answer');
+  });
+}
 
 /*
  *  handles offers coming from the signaling server
@@ -320,7 +406,31 @@ function openDataChannel(conn) {
  *  configures rtcpeerconnection for negotiation through peer
  */
 function setPeerRtcPC(peer, relay) {
+  rtcPeerConns[peer].conn.onicecandidate = (event) => {
+    if(event.candidate) {
+      sendToPeer({
+        type: 'relay',
+        relay: 'candidate',
+        candidate: event.candidate,
+        receiver: relay,
+        peer: peer
+      });
+    };
+  };
 
+  rtcPeerConns[peer].conn.createOffer((offer) => {
+    rtcPeerConns[peer].conn.setLocalDescription(offer);
+    sendToPeer({
+      type: 'relay',
+      relay: 'offer',
+      offer: offer,
+      receiver: relay,
+      peer: peer
+    });
+  }, (error) => {
+    console.log('create offer error: ', error);
+    alert('error creating offer');
+  });
 }
 
 /*
@@ -348,7 +458,7 @@ function setServerRtcPC(peer) {
     console.log('create offer error: ', error);
     alert('error creating offer');
   });
-}
+};
 
 /*
  *
