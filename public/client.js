@@ -66,6 +66,7 @@ signalingServer.onclose = () => {
 let name;
 let peers = [];
 let rtcPeerConns = {};
+let discovering = false;
 
 /*
  *  attach name and condition server message
@@ -143,15 +144,12 @@ function addRelayRouting(channel) {
       //   handleCall(data);
       //   break;
       case 'offer':
-        console.log('calling handlePeerOffer: ', data);
         handlePeerOffer(data.offer, data.peer, data.sender);
         break;
       case 'answer':
-        console.log('calling handleAnswer: ', data);
         handleAnswer(data.answer, data.peer);
         break;
       case 'candidate':
-        console.log('calling handleCandidate: ', data);
         handleCandidate(data.candidate, data.peer);
         break;
       default:
@@ -238,10 +236,13 @@ function handleLogin(success) {
  *
  */
 function peerDiscovery(peer) {
-  sendToPeer({
-    type: 'discovery',
-    receiver: peer,
-  });
+  if(discovering) {
+    console.log('starting discovery');
+    sendToPeer({
+      type: 'discovery',
+      receiver: peer,
+    });
+  };
 };
 
 /*
@@ -288,6 +289,8 @@ function getRtcPC(peer) {
  *
  */
 function handlePeerOffer(offer, peer, sender) {
+  discovering = true;
+  console.log('discovering: ', discovering);
   getRtcPC(peer);
 
   rtcPeerConns[peer].conn.onicecandidate = (event) => {
@@ -321,9 +324,11 @@ function handlePeerOffer(offer, peer, sender) {
 
 /*
  *  handles offers coming from the signaling server
- *  TODO: create handlePeerOffer() that mirrors
  */
 function handleServerOffer(offer, sender) {
+  discovering = true;
+  console.log('discovering: ', discovering);
+
   getRtcPC(sender);
 
   rtcPeerConns[sender].conn.onicecandidate = (event) => {
@@ -356,6 +361,8 @@ function handleServerOffer(offer, sender) {
  *
  */
 function handleAnswer(answer, sender) {
+  discovering = false;
+  console.log('discovering: ', discovering);
   rtcPeerConns[sender].conn.setRemoteDescription(new RTCSessionDescription(answer));
 };
 
